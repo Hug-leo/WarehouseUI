@@ -1,1579 +1,1331 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Warehouse AMR Dashboard</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@400;600;700;900&display=swap"
-    rel="stylesheet" />
-  <style>
-    /* ── Tokens ───────────────────────────────────────────────────── */
-    :root {
-      --bg: #090d12;
-      --surface: #0f161f;
-      --surface2: #141d28;
-      --border: #1a2636;
-      --border2: #1f2f42;
-      --accent: #f5a623;
-      --accent-dim: #7a5010;
-      --accent-faint: rgba(245, 166, 35, .07);
-      --green: #2ecc71;
-      --red: #e74c3c;
-      --blue: #3b9eff;
-      --purple: #a78bfa;
-      --text: #cdd9e5;
-      --muted: #4a6278;
-      --mono: 'Share Tech Mono', monospace;
-      --sans: 'Barlow', sans-serif;
-    }
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Warehouse AMR Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@400;600;700;900&display=swap" rel="stylesheet"/>
+<style>
+/* ── Tokens ───────────────────────────────────────────────────── */
+:root{
+  --bg:#090d12; --surface:#0f161f; --surface2:#141d28;
+  --border:#1a2636; --border2:#1f2f42;
+  --accent:#f5a623; --accent-dim:#7a5010; --accent-faint:rgba(245,166,35,.07);
+  --green:#2ecc71; --red:#e74c3c; --blue:#3b9eff; --purple:#a78bfa;
+  --text:#cdd9e5; --muted:#4a6278;
+  --mono:'Share Tech Mono',monospace;
+  --sans:'Barlow',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;
+  background-image:
+    linear-gradient(rgba(245,166,35,.022) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(245,166,35,.022) 1px,transparent 1px);
+  background-size:48px 48px;
+}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 
-    *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0
-    }
+/* ── Header ───────────────────────────────────────────────────── */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:13px 28px;background:var(--surface);
+  border-bottom:2px solid var(--accent);position:sticky;top:0;z-index:200;
+}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-icon{
+  width:34px;height:34px;border:2px solid var(--accent);
+  display:grid;place-items:center;font-size:17px;
+  animation:pulse-border 3s ease-in-out infinite;
+}
+@keyframes pulse-border{
+  0%,100%{box-shadow:0 0 0 0 rgba(245,166,35,0)}
+  50%{box-shadow:0 0 0 6px rgba(245,166,35,.1)}
+}
+.logo-text{font-weight:900;font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.logo-sub{font-size:9px;color:var(--muted);letter-spacing:.2em;text-transform:uppercase}
+.hdr-right{display:flex;align-items:center;gap:16px}
+.ws-badge{
+  display:flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:11px;
+  padding:4px 10px;border:1px solid var(--border2);
+}
+.ws-badge.connected{color:var(--green);border-color:rgba(46,204,113,.35)}
+.ws-badge.disconnected{color:var(--red);border-color:rgba(231,76,60,.35)}
+.ws-dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:blink 1.4s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.clock{font-family:var(--mono);font-size:12px;color:var(--muted)}
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--sans);
-      min-height: 100vh;
-      background-image:
-        linear-gradient(rgba(245, 166, 35, .022) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(245, 166, 35, .022) 1px, transparent 1px);
-      background-size: 48px 48px;
-    }
+/* ── Tabs ─────────────────────────────────────────────────────── */
+.tabs-nav{
+  display:flex;background:var(--surface);border-bottom:1px solid var(--border);
+  padding:0 28px;gap:2px;overflow-x:auto;
+}
+.tab-btn{
+  padding:12px 20px;font-family:var(--sans);font-size:11px;font-weight:700;
+  letter-spacing:.15em;text-transform:uppercase;
+  background:none;border:none;border-bottom:3px solid transparent;
+  color:var(--muted);cursor:pointer;white-space:nowrap;transition:color .2s,border-color .2s;
+}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.cnt{
+  display:inline-block;margin-left:5px;background:var(--border2);
+  padding:1px 6px;border-radius:10px;font-size:9px;color:var(--muted);font-family:var(--mono);
+}
+.tab-btn.active .cnt{background:var(--accent-dim);color:var(--accent)}
 
-    ::-webkit-scrollbar {
-      width: 5px;
-      height: 5px
-    }
+/* ── Tab panels ───────────────────────────────────────────────── */
+.tab-panel{display:none;animation:fadein .18s ease}
+.tab-panel.active{display:block}
+@keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 
-    ::-webkit-scrollbar-track {
-      background: var(--bg)
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: var(--border2);
-      border-radius: 3px
-    }
-
-    /* ── Header ───────────────────────────────────────────────────── */
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 13px 28px;
-      background: var(--surface);
-      border-bottom: 2px solid var(--accent);
-      position: sticky;
-      top: 0;
-      z-index: 200;
-    }
-
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 12px
-    }
-
-    .logo-icon {
-      width: 34px;
-      height: 34px;
-      border: 2px solid var(--accent);
-      display: grid;
-      place-items: center;
-      font-size: 17px;
-      animation: pulse-border 3s ease-in-out infinite;
-    }
-
-    @keyframes pulse-border {
-
-      0%,
-      100% {
-        box-shadow: 0 0 0 0 rgba(245, 166, 35, 0)
-      }
-
-      50% {
-        box-shadow: 0 0 0 6px rgba(245, 166, 35, .1)
-      }
-    }
-
-    .logo-text {
-      font-weight: 900;
-      font-size: 15px;
-      letter-spacing: .14em;
-      text-transform: uppercase;
-      color: var(--accent)
-    }
-
-    .logo-sub {
-      font-size: 9px;
-      color: var(--muted);
-      letter-spacing: .2em;
-      text-transform: uppercase
-    }
-
-    .hdr-right {
-      display: flex;
-      align-items: center;
-      gap: 16px
-    }
-
-    .ws-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-family: var(--mono);
-      font-size: 11px;
-      padding: 4px 10px;
-      border: 1px solid var(--border2);
-    }
-
-    .ws-badge.connected {
-      color: var(--green);
-      border-color: rgba(46, 204, 113, .35)
-    }
-
-    .ws-badge.disconnected {
-      color: var(--red);
-      border-color: rgba(231, 76, 60, .35)
-    }
-
-    .ws-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: currentColor;
-      animation: blink 1.4s ease-in-out infinite
-    }
-
-    @keyframes blink {
-
-      0%,
-      100% {
-        opacity: 1
-      }
-
-      50% {
-        opacity: .2
-      }
-    }
-
-    .clock {
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--muted)
-    }
-
-    /* ── Tabs ─────────────────────────────────────────────────────── */
-    .tabs-nav {
-      display: flex;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 0 28px;
-      gap: 2px;
-      overflow-x: auto;
-    }
-
-    .tab-btn {
-      padding: 12px 20px;
-      font-family: var(--sans);
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: .15em;
-      text-transform: uppercase;
-      background: none;
-      border: none;
-      border-bottom: 3px solid transparent;
-      color: var(--muted);
-      cursor: pointer;
-      white-space: nowrap;
-      transition: color .2s, border-color .2s;
-    }
-
-    .tab-btn:hover {
-      color: var(--text)
-    }
-
-    .tab-btn.active {
-      color: var(--accent);
-      border-bottom-color: var(--accent)
-    }
-
-    .cnt {
-      display: inline-block;
-      margin-left: 5px;
-      background: var(--border2);
-      padding: 1px 6px;
-      border-radius: 10px;
-      font-size: 9px;
-      color: var(--muted);
-      font-family: var(--mono);
-    }
-
-    .tab-btn.active .cnt {
-      background: var(--accent-dim);
-      color: var(--accent)
-    }
-
-    /* ── Tab panels ───────────────────────────────────────────────── */
-    .tab-panel {
-      display: none;
-      animation: fadein .18s ease
-    }
-
-    .tab-panel.active {
-      display: block
-    }
-
-    @keyframes fadein {
-      from {
-        opacity: 0;
-        transform: translateY(3px)
-      }
-
-      to {
-        opacity: 1;
-        transform: none
-      }
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
    LIVE VIEW TAB
 ════════════════════════════════════════════════════════════════ */
-    #tab-live {
-      padding: 24px 28px
-    }
+#tab-live{padding:24px 28px}
 
-    /* ── spotlight (latest scan) ─────────────────────────────────── */
-    .spotlight-wrap {
-      display: grid;
-      grid-template-columns: 1fr 340px;
-      gap: 16px;
-      margin-bottom: 24px;
-    }
+/* ── spotlight (latest scan) ─────────────────────────────────── */
+.spotlight-wrap{
+  display:grid;
+  grid-template-columns:1fr 340px;
+  gap:16px;
+  margin-bottom:24px;
+}
+@media(max-width:900px){.spotlight-wrap{grid-template-columns:1fr}}
 
-    @media(max-width:900px) {
-      .spotlight-wrap {
-        grid-template-columns: 1fr
-      }
-    }
+.spotlight{
+  background:var(--surface);
+  border:1px solid var(--border2);
+  border-top:3px solid var(--accent);
+  padding:28px 32px;
+  position:relative;
+  overflow:hidden;
+}
+.spotlight::before{
+  content:'LATEST SCAN';
+  position:absolute;top:18px;right:20px;
+  font-family:var(--mono);font-size:9px;letter-spacing:.2em;
+  color:var(--accent-dim);
+}
+.spotlight.flash{animation:spot-flash .6s ease-out}
+@keyframes spot-flash{
+  0%{border-top-color:var(--green);box-shadow:0 0 28px rgba(46,204,113,.2)}
+  100%{border-top-color:var(--accent);box-shadow:none}
+}
+.spot-empty{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:180px;gap:10px;color:var(--muted);
+}
+.spot-empty-icon{font-size:36px;opacity:.3}
+.spot-empty-txt{font-family:var(--mono);font-size:11px;letter-spacing:.15em}
 
-    .spotlight {
-      background: var(--surface);
-      border: 1px solid var(--border2);
-      border-top: 3px solid var(--accent);
-      padding: 28px 32px;
-      position: relative;
-      overflow: hidden;
-    }
+/* scan card rows */
+.scan-card{display:flex;flex-direction:column;gap:20px}
 
-    .spotlight::before {
-      content: 'LATEST SCAN';
-      position: absolute;
-      top: 18px;
-      right: 20px;
-      font-family: var(--mono);
-      font-size: 9px;
-      letter-spacing: .2em;
-      color: var(--accent-dim);
-    }
+.card-row{display:flex;align-items:flex-start;gap:0}
+.card-label{
+  font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);width:110px;flex-shrink:0;padding-top:4px;
+}
+.card-value{
+  font-family:var(--mono);font-size:22px;font-weight:600;
+  color:var(--text);line-height:1.2;word-break:break-all;
+}
+.card-value.robot {color:var(--green)}
+.card-value.loc   {color:var(--accent)}
+.card-value.prod  {color:var(--blue)}
+.card-value.qty   {color:var(--purple);font-size:28px}
+.card-value.na    {color:var(--muted);font-size:14px;padding-top:5px}
 
-    .spotlight.flash {
-      animation: spot-flash .6s ease-out
-    }
+.card-sub{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px}
 
-    @keyframes spot-flash {
-      0% {
-        border-top-color: var(--green);
-        box-shadow: 0 0 28px rgba(46, 204, 113, .2)
-      }
+.scan-time-bar{
+  margin-top:18px;padding-top:14px;border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.scan-time-lbl{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.12em}
+.scan-time-val{font-family:var(--mono);font-size:12px;color:var(--text)}
 
-      100% {
-        border-top-color: var(--accent);
-        box-shadow: none
-      }
-    }
+/* ── stat summary panel ──────────────────────────────────────── */
+.stat-stack{
+  display:flex;flex-direction:column;gap:12px;
+}
+.stat-box{
+  background:var(--surface);border:1px solid var(--border);
+  padding:18px 20px;
+}
+.stat-lbl{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.stat-val{font-family:var(--mono);font-size:26px;color:var(--accent);line-height:1}
+.stat-val.g{color:var(--green)}
+.stat-sub{font-size:10px;color:var(--muted);margin-top:4px}
 
-    .spot-empty {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 180px;
-      gap: 10px;
-      color: var(--muted);
-    }
+/* ── history feed ────────────────────────────────────────────── */
+.feed-header{
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;
+}
+.feed-title{
+  font-size:10px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--accent);display:flex;align-items:center;gap:8px;
+}
+.feed-title::before{content:'';display:inline-block;width:3px;height:14px;background:var(--accent)}
+.feed-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:10px;
+  max-height:420px;overflow-y:auto;
+  padding-right:4px;
+}
 
-    .spot-empty-icon {
-      font-size: 36px;
-      opacity: .3
-    }
+/* history card */
+.h-card{
+  background:var(--surface);border:1px solid var(--border);
+  padding:14px 16px;cursor:default;
+  transition:border-color .2s,background .2s;
+  position:relative;
+}
+.h-card:hover{border-color:var(--border2);background:var(--surface2)}
+.h-card.new{animation:card-in .4s ease-out}
+@keyframes card-in{
+  from{opacity:0;transform:translateY(-8px);border-color:var(--green)}
+  80%{border-color:var(--green)}
+  to{opacity:1;transform:none}
+}
+.h-card-top{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:10px;
+}
+.h-robot{font-family:var(--mono);font-size:12px;color:var(--green)}
+.h-time{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.h-loc{font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:600;margin-bottom:6px}
+.h-prod{font-family:var(--mono);font-size:12px;color:var(--blue);margin-bottom:2px}
+.h-qty{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.h-qty span{color:var(--purple)}
+.h-na{font-family:var(--mono);font-size:10px;color:var(--muted);font-style:italic}
 
-    .spot-empty-txt {
-      font-family: var(--mono);
-      font-size: 11px;
-      letter-spacing: .15em
-    }
-
-    /* scan card rows */
-    .scan-card {
-      display: flex;
-      flex-direction: column;
-      gap: 20px
-    }
-
-    .card-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 0
-    }
-
-    .card-label {
-      font-family: var(--mono);
-      font-size: 10px;
-      letter-spacing: .18em;
-      text-transform: uppercase;
-      color: var(--muted);
-      width: 110px;
-      flex-shrink: 0;
-      padding-top: 4px;
-    }
-
-    .card-value {
-      font-family: var(--mono);
-      font-size: 22px;
-      font-weight: 600;
-      color: var(--text);
-      line-height: 1.2;
-      word-break: break-all;
-    }
-
-    .card-value.robot {
-      color: var(--green)
-    }
-
-    .card-value.loc {
-      color: var(--accent)
-    }
-
-    .card-value.prod {
-      color: var(--blue)
-    }
-
-    .card-value.qty {
-      color: var(--purple);
-      font-size: 28px
-    }
-
-    .card-value.na {
-      color: var(--muted);
-      font-size: 14px;
-      padding-top: 5px
-    }
-
-    .card-sub {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted);
-      margin-top: 2px
-    }
-
-    .scan-time-bar {
-      margin-top: 18px;
-      padding-top: 14px;
-      border-top: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .scan-time-lbl {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--muted);
-      letter-spacing: .12em
-    }
-
-    .scan-time-val {
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--text)
-    }
-
-    /* ── stat summary panel ──────────────────────────────────────── */
-    .stat-stack {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .stat-box {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: 18px 20px;
-    }
-
-    .stat-lbl {
-      font-size: 9px;
-      letter-spacing: .2em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 6px
-    }
-
-    .stat-val {
-      font-family: var(--mono);
-      font-size: 26px;
-      color: var(--accent);
-      line-height: 1
-    }
-
-    .stat-val.g {
-      color: var(--green)
-    }
-
-    .stat-sub {
-      font-size: 10px;
-      color: var(--muted);
-      margin-top: 4px
-    }
-
-    /* ── history feed ────────────────────────────────────────────── */
-    .feed-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
-    }
-
-    .feed-title {
-      font-size: 10px;
-      letter-spacing: .22em;
-      text-transform: uppercase;
-      color: var(--accent);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .feed-title::before {
-      content: '';
-      display: inline-block;
-      width: 3px;
-      height: 14px;
-      background: var(--accent)
-    }
-
-    .feed-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 10px;
-      max-height: 420px;
-      overflow-y: auto;
-      padding-right: 4px;
-    }
-
-    /* history card */
-    .h-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: 14px 16px;
-      cursor: default;
-      transition: border-color .2s, background .2s;
-      position: relative;
-    }
-
-    .h-card:hover {
-      border-color: var(--border2);
-      background: var(--surface2)
-    }
-
-    .h-card.new {
-      animation: card-in .4s ease-out
-    }
-
-    @keyframes card-in {
-      from {
-        opacity: 0;
-        transform: translateY(-8px);
-        border-color: var(--green)
-      }
-
-      80% {
-        border-color: var(--green)
-      }
-
-      to {
-        opacity: 1;
-        transform: none
-      }
-    }
-
-    .h-card-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 10px;
-    }
-
-    .h-robot {
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--green)
-    }
-
-    .h-time {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--muted)
-    }
-
-    .h-loc {
-      font-family: var(--mono);
-      font-size: 13px;
-      color: var(--accent);
-      font-weight: 600;
-      margin-bottom: 6px
-    }
-
-    .h-prod {
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--blue);
-      margin-bottom: 2px
-    }
-
-    .h-qty {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted)
-    }
-
-    .h-qty span {
-      color: var(--purple)
-    }
-
-    .h-na {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--muted);
-      font-style: italic
-    }
-
-    /* ══════════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════
    CRUD TABS (shared styles)
 ════════════════════════════════════════════════════════════════ */
-    .crud-panel {
-      padding: 22px 28px
-    }
+.crud-panel{padding:22px 28px}
+.panel-header{
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;
+}
+.panel-title{
+  font-size:10px;letter-spacing:.25em;text-transform:uppercase;
+  color:var(--accent);display:flex;align-items:center;gap:8px;
+}
+.panel-title::before{content:'';display:inline-block;width:3px;height:14px;background:var(--accent)}
 
-    .panel-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
+.table-wrap{border:1px solid var(--border);overflow:hidden;overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:420px}
+thead tr{background:#0a1018;border-bottom:1px solid var(--accent)}
+th{
+  padding:10px 14px;text-align:left;font-size:9px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--accent-dim);font-weight:700;white-space:nowrap;
+}
+tbody tr{border-bottom:1px solid var(--border);transition:background .15s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--accent-faint)}
+td{padding:10px 14px;font-family:var(--mono);font-size:12px;color:var(--text)}
+td.id{color:var(--muted);font-size:10px}
+td.code{color:var(--accent);font-weight:600}
+td.robot{color:var(--green)}
+td.qty{color:var(--purple);font-weight:600}
+td.time{color:var(--muted);font-size:11px}
+td.acts{display:flex;gap:5px}
+.state-row td{text-align:center;padding:44px 14px;color:var(--muted);font-family:var(--mono);font-size:11px}
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:5px}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-    .panel-title {
-      font-size: 10px;
-      letter-spacing: .25em;
-      text-transform: uppercase;
-      color: var(--accent);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+/* ── Buttons ──────────────────────────────────────────────────── */
+.btn{
+  display:inline-flex;align-items:center;gap:5px;padding:7px 14px;
+  border:none;cursor:pointer;font-family:var(--sans);font-weight:700;
+  font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  transition:opacity .15s,transform .1s;
+}
+.btn:hover{opacity:.85}.btn:active{transform:scale(.96)}
+.btn-primary{background:var(--accent);color:#000}
+.btn-danger{background:var(--red);color:#fff}
+.btn-ghost{background:var(--border);color:var(--text)}
+.btn-sm{padding:4px 9px;font-size:9px}
 
-    .panel-title::before {
-      content: '';
-      display: inline-block;
-      width: 3px;
-      height: 14px;
-      background: var(--accent)
-    }
+/* ── Modal ────────────────────────────────────────────────────── */
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(0,0,0,.75);
+  display:none;place-items:center;z-index:500;padding:20px;
+}
+.modal-backdrop.open{display:grid}
+.modal{
+  background:var(--surface);border:1px solid var(--border2);
+  border-top:3px solid var(--accent);width:100%;max-width:460px;
+  max-height:90vh;overflow-y:auto;animation:modal-in .18s ease;
+}
+.modal.danger{border-top-color:var(--red)}
+@keyframes modal-in{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+.modal-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px;border-bottom:1px solid var(--border);
+}
+.modal-title{font-weight:700;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.modal-title.danger{color:var(--red)}
+.modal-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:20px}
+.modal-footer{
+  padding:14px 20px;border-top:1px solid var(--border);
+  display:flex;justify-content:flex-end;gap:8px;
+}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-grid.one{grid-template-columns:1fr}
+.field{display:flex;flex-direction:column;gap:4px}
+.field.full{grid-column:1/-1}
+label{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+input,select{
+  background:var(--bg);border:1px solid var(--border2);color:var(--text);
+  font-family:var(--mono);font-size:12px;padding:8px 11px;outline:none;transition:border-color .2s;
+}
+input:focus,select:focus{border-color:var(--accent)}
+select option{background:var(--surface)}
+.confirm-msg{font-size:13px;color:var(--text);line-height:1.65}
+.confirm-msg strong{color:var(--accent);font-family:var(--mono)}
 
-    .table-wrap {
-      border: 1px solid var(--border);
-      overflow: hidden;
-      overflow-x: auto
-    }
+/* ── Toast ────────────────────────────────────────────────────── */
+#toast{
+  position:fixed;bottom:22px;right:22px;
+  background:var(--surface2);border:1px solid var(--border2);
+  padding:11px 16px;font-family:var(--mono);font-size:11px;
+  display:none;z-index:999;animation:slide-up .22s ease;
+  max-width:320px;border-left-width:3px;
+}
+#toast.ok{color:var(--green);border-left-color:var(--green)}
+#toast.err{color:var(--red);border-left-color:var(--red)}
+@keyframes slide-up{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 420px
-    }
-
-    thead tr {
-      background: #0a1018;
-      border-bottom: 1px solid var(--accent)
-    }
-
-    th {
-      padding: 10px 14px;
-      text-align: left;
-      font-size: 9px;
-      letter-spacing: .2em;
-      text-transform: uppercase;
-      color: var(--accent-dim);
-      font-weight: 700;
-      white-space: nowrap;
-    }
-
-    tbody tr {
-      border-bottom: 1px solid var(--border);
-      transition: background .15s
-    }
-
-    tbody tr:last-child {
-      border-bottom: none
-    }
-
-    tbody tr:hover {
-      background: var(--accent-faint)
-    }
-
-    td {
-      padding: 10px 14px;
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--text)
-    }
-
-    td.id {
-      color: var(--muted);
-      font-size: 10px
-    }
-
-    td.code {
-      color: var(--accent);
-      font-weight: 600
-    }
-
-    td.robot {
-      color: var(--green)
-    }
-
-    td.qty {
-      color: var(--purple);
-      font-weight: 600
-    }
-
-    td.time {
-      color: var(--muted);
-      font-size: 11px
-    }
-
-    td.acts {
-      display: flex;
-      gap: 5px
-    }
-
-    .state-row td {
-      text-align: center;
-      padding: 44px 14px;
-      color: var(--muted);
-      font-family: var(--mono);
-      font-size: 11px
-    }
-
-    .spinner {
-      display: inline-block;
-      width: 13px;
-      height: 13px;
-      border: 2px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-      vertical-align: middle;
-      margin-right: 5px
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg)
-      }
-    }
-
-    /* ── Buttons ──────────────────────────────────────────────────── */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 7px 14px;
-      border: none;
-      cursor: pointer;
-      font-family: var(--sans);
-      font-weight: 700;
-      font-size: 10px;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      transition: opacity .15s, transform .1s;
-    }
-
-    .btn:hover {
-      opacity: .85
-    }
-
-    .btn:active {
-      transform: scale(.96)
-    }
-
-    .btn-primary {
-      background: var(--accent);
-      color: #000
-    }
-
-    .btn-danger {
-      background: var(--red);
-      color: #fff
-    }
-
-    .btn-ghost {
-      background: var(--border);
-      color: var(--text)
-    }
-
-    .btn-sm {
-      padding: 4px 9px;
-      font-size: 9px
-    }
-
-    /* ── Modal ────────────────────────────────────────────────────── */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, .75);
-      display: none;
-      place-items: center;
-      z-index: 500;
-      padding: 20px;
-    }
-
-    .modal-backdrop.open {
-      display: grid
-    }
-
-    .modal {
-      background: var(--surface);
-      border: 1px solid var(--border2);
-      border-top: 3px solid var(--accent);
-      width: 100%;
-      max-width: 460px;
-      max-height: 90vh;
-      overflow-y: auto;
-      animation: modal-in .18s ease;
-    }
-
-    .modal.danger {
-      border-top-color: var(--red)
-    }
-
-    @keyframes modal-in {
-      from {
-        opacity: 0;
-        transform: translateY(-10px)
-      }
-
-      to {
-        opacity: 1;
-        transform: none
-      }
-    }
-
-    .modal-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .modal-title {
-      font-weight: 700;
-      font-size: 12px;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      color: var(--accent)
-    }
-
-    .modal-title.danger {
-      color: var(--red)
-    }
-
-    .modal-close {
-      background: none;
-      border: none;
-      color: var(--muted);
-      font-size: 20px;
-      cursor: pointer;
-      line-height: 1
-    }
-
-    .modal-close:hover {
-      color: var(--text)
-    }
-
-    .modal-body {
-      padding: 20px
-    }
-
-    .modal-footer {
-      padding: 14px 20px;
-      border-top: 1px solid var(--border);
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-    }
-
-    .form-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px
-    }
-
-    .form-grid.one {
-      grid-template-columns: 1fr
-    }
-
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 4px
-    }
-
-    .field.full {
-      grid-column: 1/-1
-    }
-
-    label {
-      font-size: 9px;
-      letter-spacing: .18em;
-      text-transform: uppercase;
-      color: var(--muted)
-    }
-
-    input,
-    select {
-      background: var(--bg);
-      border: 1px solid var(--border2);
-      color: var(--text);
-      font-family: var(--mono);
-      font-size: 12px;
-      padding: 8px 11px;
-      outline: none;
-      transition: border-color .2s;
-    }
-
-    input:focus,
-    select:focus {
-      border-color: var(--accent)
-    }
-
-    select option {
-      background: var(--surface)
-    }
-
-    .confirm-msg {
-      font-size: 13px;
-      color: var(--text);
-      line-height: 1.65
-    }
-
-    .confirm-msg strong {
-      color: var(--accent);
-      font-family: var(--mono)
-    }
-
-    /* ── Toast ────────────────────────────────────────────────────── */
-    #toast {
-      position: fixed;
-      bottom: 22px;
-      right: 22px;
-      background: var(--surface2);
-      border: 1px solid var(--border2);
-      padding: 11px 16px;
-      font-family: var(--mono);
-      font-size: 11px;
-      display: none;
-      z-index: 999;
-      animation: slide-up .22s ease;
-      max-width: 320px;
-      border-left-width: 3px;
-    }
-
-    #toast.ok {
-      color: var(--green);
-      border-left-color: var(--green)
-    }
-
-    #toast.err {
-      color: var(--red);
-      border-left-color: var(--red)
-    }
-
-    @keyframes slide-up {
-      from {
-        transform: translateY(8px);
-        opacity: 0
-      }
-
-      to {
-        transform: none;
-        opacity: 1
-      }
-    }
-
-    /* ══════════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════
    CAMERA TAB STYLES
 ════════════════════════════════════════════════════════════════ */
 
-    /* Status badge */
-    .cam-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-family: var(--mono);
-      font-size: 11px;
-      padding: 5px 12px;
-      border: 1px solid transparent;
-      transition: color .3s, border-color .3s;
-    }
+/* Status badge */
+.cam-badge{
+  display:flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:11px;
+  padding:5px 12px;border:1px solid transparent;
+  transition:color .3s,border-color .3s;
+}
+.cam-badge.online { color:var(--green);border-color:rgba(46,204,113,.35) }
+.cam-badge.offline{ color:var(--muted);border-color:var(--border)        }
+.cam-dot{
+  width:7px;height:7px;border-radius:50%;background:currentColor;
+}
+.cam-badge.online .cam-dot{ animation:blink 1.4s ease-in-out infinite }
 
-    .cam-badge.online {
-      color: var(--green);
-      border-color: rgba(46, 204, 113, .35)
-    }
+/* URL bar */
+.cam-url-bar{
+  display:flex;align-items:center;gap:10px;
+  background:var(--surface2);border:1px solid var(--border);
+  padding:10px 14px;margin-bottom:16px;flex-wrap:wrap;
+}
+.cam-url-lbl{
+  font-family:var(--mono);font-size:10px;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--muted);white-space:nowrap;
+}
+.cam-url-bar input{
+  flex:1;min-width:220px;background:var(--bg);
+  border:1px solid var(--border2);color:var(--accent);
+  font-family:var(--mono);font-size:12px;padding:7px 11px;
+}
+.cam-url-bar input:focus{border-color:var(--accent)}
 
-    .cam-badge.offline {
-      color: var(--muted);
-      border-color: var(--border)
-    }
+/* Video window */
+.cam-window{
+  width:100%;
+  aspect-ratio:16/9;
+  background:#000;
+  border:1px solid var(--border2);
+  border-top:3px solid var(--accent);
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;position:relative;
+  max-height:62vh;
+}
 
-    .cam-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: currentColor;
-    }
+/* Shared state overlay */
+.cam-state{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:10px;
+  text-align:center;padding:40px;
+}
+.cam-state-icon{font-size:40px;opacity:.45}
+.cam-state-title{
+  font-family:var(--mono);font-size:14px;letter-spacing:.1em;color:var(--text);
+}
+.cam-state-sub{
+  font-family:var(--mono);font-size:11px;color:var(--muted);max-width:340px;line-height:1.6;
+}
 
-    .cam-badge.online .cam-dot {
-      animation: blink 1.4s ease-in-out infinite
-    }
+/* Loading spinner (larger than table spinner) */
+.cam-spinner{
+  width:36px;height:36px;
+  border:3px solid var(--border);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .8s linear infinite;
+  margin-bottom:4px;
+}
 
-    /* URL bar */
-    .cam-url-bar {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      padding: 10px 14px;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
+/* Footer */
+.cam-footer{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 14px;background:var(--surface2);border:1px solid var(--border);
+  border-top:none;font-family:var(--mono);font-size:10px;flex-wrap:wrap;gap:8px;
+}
+/* ══════════════════════════════════════════════════════════════
+   AMR CONTROL TAB — STYLES
+════════════════════════════════════════════════════════════════ */
+#tab-amr { padding:0 }
+.amr-layout {
+  display:grid;
+  grid-template-columns:300px 1fr 300px;
+  grid-template-rows:auto 1fr;
+  min-height:calc(100vh - 120px);
+  gap:0;
+}
+@media(max-width:1100px){
+  .amr-layout{ grid-template-columns:1fr 1fr; }
+  .amr-map-col{ grid-column:1/-1; order:-1; }
+}
+@media(max-width:700px){
+  .amr-layout{ grid-template-columns:1fr; }
+}
 
-    .cam-url-lbl {
-      font-family: var(--mono);
-      font-size: 10px;
-      letter-spacing: .15em;
-      text-transform: uppercase;
-      color: var(--muted);
-      white-space: nowrap;
-    }
+/* Column panels */
+.amr-col {
+  border-right:1px solid var(--border);
+  overflow-y:auto;
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+.amr-col:last-child{ border-right:none }
+.amr-map-col {
+  border-right:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  background:var(--bg);
+}
 
-    .cam-url-bar input {
-      flex: 1;
-      min-width: 220px;
-      background: var(--bg);
-      border: 1px solid var(--border2);
-      color: var(--accent);
-      font-family: var(--mono);
-      font-size: 12px;
-      padding: 7px 11px;
-    }
+/* Section card */
+.amr-card {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:2px;
+}
+.amr-card-hdr {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:9px 14px;border-bottom:1px solid var(--border);
+}
+.amr-card-title {
+  font-size:9px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--accent);font-weight:700;
+  display:flex;align-items:center;gap:7px;
+}
+.amr-card-title::before{
+  content:'';display:inline-block;width:2px;height:12px;background:var(--accent);
+}
+.amr-card-body{ padding:12px 14px }
 
-    .cam-url-bar input:focus {
-      border-color: var(--accent)
-    }
+/* Connection bar */
+.ros-bar {
+  display:flex;align-items:center;gap:8px;
+  padding:10px 14px;
+  background:var(--surface2);
+  border-bottom:1px solid var(--border);
+}
+.ros-bar input {
+  flex:1;background:var(--bg);border:1px solid var(--border2);
+  color:var(--text);font-family:var(--mono);font-size:11px;
+  padding:6px 10px;outline:none;
+}
+.ros-bar input:focus{border-color:var(--accent)}
+.ros-dot{
+  width:8px;height:8px;border-radius:50%;background:var(--red);
+  flex-shrink:0;transition:background .3s;
+}
+.ros-dot.on{ background:var(--green);animation:blink 1.8s ease-in-out infinite }
+.ros-status-txt{font-family:var(--mono);font-size:10px;color:var(--muted)}
 
-    /* Video window */
-    .cam-window {
-      width: 100%;
-      aspect-ratio: 16/9;
-      background: #000;
-      border: 1px solid var(--border2);
-      border-top: 3px solid var(--accent);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      position: relative;
-      max-height: 62vh;
-    }
+/* Mode toggle */
+.mode-toggle{
+  display:grid;grid-template-columns:1fr 1fr;gap:0;
+  border:1px solid var(--border2);overflow:hidden;
+}
+.mode-btn{
+  padding:9px;border:none;cursor:pointer;
+  font-family:var(--sans);font-weight:700;font-size:10px;
+  letter-spacing:.12em;text-transform:uppercase;
+  background:var(--surface2);color:var(--muted);
+  transition:background .2s,color .2s;
+}
+.mode-btn.active-manual{background:var(--blue);color:#fff}
+.mode-btn.active-auto{background:var(--green);color:#000}
 
-    /* Shared state overlay */
-    .cam-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      text-align: center;
-      padding: 40px;
-    }
+/* E-STOP */
+.estop-btn{
+  width:100%;padding:16px;border:none;cursor:pointer;
+  background:var(--red);color:#fff;
+  font-family:var(--sans);font-weight:900;font-size:13px;
+  letter-spacing:.18em;text-transform:uppercase;
+  border:3px solid #ff6b6b;
+  transition:filter .15s,transform .1s;
+  animation:estop-pulse 2s ease-in-out infinite;
+}
+.estop-btn:hover{filter:brightness(1.15)}
+.estop-btn:active{transform:scale(.97)}
+@keyframes estop-pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(231,76,60,0)}
+  50%{box-shadow:0 0 0 8px rgba(231,76,60,.2)}
+}
 
-    .cam-state-icon {
-      font-size: 40px;
-      opacity: .45
-    }
+/* Teleop grid */
+.teleop-grid{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;
+}
+.t-btn{
+  padding:14px 6px;border:none;cursor:pointer;
+  background:var(--surface2);border:1px solid var(--border2);
+  color:var(--text);font-size:16px;
+  transition:background .15s;
+  font-family:var(--mono);
+}
+.t-btn:active,.t-btn.pressed{background:var(--blue);border-color:var(--blue)}
+.t-btn.stop-btn{background:rgba(231,76,60,.15);border-color:var(--red);color:var(--red)}
+.t-btn:disabled{opacity:.3;cursor:default}
 
-    .cam-state-title {
-      font-family: var(--mono);
-      font-size: 14px;
-      letter-spacing: .1em;
-      color: var(--text);
-    }
+/* Speed slider */
+.speed-row{
+  display:flex;align-items:center;gap:10px;margin-top:6px;
+}
+.speed-row label{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.speed-row input[type=range]{flex:1;accent-color:var(--accent)}
+.speed-val{font-family:var(--mono);font-size:11px;color:var(--accent);width:42px;text-align:right}
 
-    .cam-state-sub {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted);
-      max-width: 340px;
-      line-height: 1.6;
-    }
+/* Waypoint list */
+.wp-list{
+  max-height:160px;overflow-y:auto;
+  display:flex;flex-direction:column;gap:4px;
+  margin-top:8px;
+}
+.wp-item{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 10px;
+  background:var(--surface2);border:1px solid var(--border);
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+  cursor:pointer;transition:border-color .15s;
+}
+.wp-item:hover{border-color:var(--border2)}
+.wp-item.active-wp{border-color:var(--green);color:var(--green)}
+.wp-item.done-wp{border-color:var(--border);color:var(--muted);opacity:.5}
+.wp-num{
+  width:18px;height:18px;border-radius:50%;
+  background:var(--accent);color:#000;
+  display:grid;place-items:center;font-size:9px;font-weight:700;flex-shrink:0;
+}
+.wp-item.active-wp .wp-num{background:var(--green)}
+.wp-item.done-wp .wp-num{background:var(--border);color:var(--muted)}
+.wp-coords{flex:1}
+.wp-del{background:none;border:none;color:var(--red);cursor:pointer;font-size:13px;opacity:.6}
+.wp-del:hover{opacity:1}
 
-    /* Loading spinner (larger than table spinner) */
-    .cam-spinner {
-      width: 36px;
-      height: 36px;
-      border: 3px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin .8s linear infinite;
-      margin-bottom: 4px;
-    }
+/* IMU display */
+.imu-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;
+}
+.imu-box{
+  background:var(--surface2);border:1px solid var(--border);
+  padding:10px 12px;text-align:center;
+}
+.imu-lbl{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.imu-val{font-family:var(--mono);font-size:18px;color:var(--blue)}
 
-    /* Footer */
-    .cam-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 14px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-top: none;
-      font-family: var(--mono);
-      font-size: 10px;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-  </style>
-</head>
+/* PID inputs */
+.pid-row{display:flex;gap:6px}
+.pid-row input{
+  flex:1;background:var(--bg);border:1px solid var(--border2);
+  color:var(--text);font-family:var(--mono);font-size:12px;
+  padding:7px;text-align:center;outline:none;
+}
+.pid-row input:focus{border-color:var(--accent)}
 
+/* Chart wrappers */
+.chart-box{
+  background:var(--bg);border:1px solid var(--border);
+  padding:8px;position:relative;height:100px;
+}
+.chart-box-lbl{
+  position:absolute;top:6px;left:10px;
+  font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.12em;
+  text-transform:uppercase;
+}
+
+/* Navigation status panel */
+.nav-status{
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;
+}
+.ns-box{
+  background:var(--surface2);border:1px solid var(--border);
+  padding:10px 12px;
+}
+.ns-lbl{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.ns-val{font-family:var(--mono);font-size:13px;color:var(--text)}
+.ns-val.idle   {color:var(--muted)}
+.ns-val.navigating{color:var(--blue)}
+.ns-val.success{color:var(--green)}
+.ns-val.failed {color:var(--red)}
+
+/* Map container */
+#amr-map-wrap{
+  flex:1;
+  position:relative;
+  background:#1a2535;
+  overflow:hidden;
+  cursor:crosshair;
+  min-height:400px;
+}
+#amr-map-wrap canvas{display:block}
+.map-toolbar{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 14px;background:var(--surface);
+  border-bottom:1px solid var(--border);
+  flex-wrap:wrap;
+}
+.map-tool-btn{
+  padding:5px 12px;border:1px solid var(--border2);
+  background:var(--surface2);color:var(--muted);
+  font-family:var(--mono);font-size:10px;letter-spacing:.1em;
+  cursor:pointer;transition:background .15s,color .15s;
+}
+.map-tool-btn:hover{background:var(--border2);color:var(--text)}
+.map-tool-btn.active{background:var(--accent);color:#000;border-color:var(--accent)}
+.map-hint{
+  flex:1;text-align:right;font-family:var(--mono);font-size:10px;
+  color:var(--muted);
+}
+.map-coords{
+  padding:4px 14px;background:var(--surface);border-top:1px solid var(--border);
+  font-family:var(--mono);font-size:10px;color:var(--muted);
+  display:flex;justify-content:space-between;
+}
+
+/* Waypoint preset buttons */
+.wp-preset-grid{display:flex;flex-direction:column;gap:5px}
+.wp-preset{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 10px;border:1px solid var(--border2);
+  background:var(--surface2);cursor:pointer;
+  font-family:var(--mono);font-size:11px;color:var(--text);
+  transition:border-color .15s,background .15s;
+}
+.wp-preset:hover{border-color:var(--accent);background:var(--accent-faint)}
+.wp-preset-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* Toggle switch */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:4px 0}
+.toggle-lbl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.toggle{position:relative;width:36px;height:20px;cursor:pointer}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{
+  position:absolute;inset:0;background:var(--border2);
+  border-radius:10px;transition:.2s;
+}
+.toggle-slider:before{
+  content:'';position:absolute;height:14px;width:14px;
+  left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;
+}
+.toggle input:checked + .toggle-slider{background:var(--green)}
+.toggle input:checked + .toggle-slider:before{transform:translateX(16px)}
+
+/* Small utility buttons */
+.amr-btn{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:7px 12px;border:none;cursor:pointer;
+  font-family:var(--sans);font-weight:700;font-size:10px;
+  letter-spacing:.1em;text-transform:uppercase;
+  transition:opacity .15s;
+}
+.amr-btn:hover{opacity:.85}
+.amr-btn-accent{background:var(--accent);color:#000}
+.amr-btn-green{background:var(--green);color:#000}
+.amr-btn-ghost{background:var(--border);color:var(--text)}
+.amr-btn-danger{background:var(--red);color:#fff}
+.amr-btn-full{width:100%;justify-content:center}
+.amr-btn:disabled{opacity:.3;cursor:default}
+</style>
 <body>
 
-  <!-- ── Header ──────────────────────────────────────────────────── -->
-  <header>
-    <div class="logo">
-      <div class="logo-icon">🤖</div>
-      <div>
-        <div class="logo-text">WarehouseOS</div>
-        <div class="logo-sub">AMR Real-Time Dashboard</div>
-      </div>
+<!-- ── Header ──────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🤖</div>
+    <div>
+      <div class="logo-text">WarehouseOS</div>
+      <div class="logo-sub">AMR Real-Time Dashboard</div>
     </div>
-    <div class="hdr-right">
-      <div class="ws-badge disconnected" id="ws-badge">
-        <div class="ws-dot"></div>
-        <span id="ws-label">CONNECTING…</span>
-      </div>
-      <div class="clock" id="clock">--:--:--</div>
+  </div>
+  <div class="hdr-right">
+    <div class="ws-badge disconnected" id="ws-badge">
+      <div class="ws-dot"></div>
+      <span id="ws-label">CONNECTING…</span>
     </div>
-  </header>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+</header>
 
-  <!-- ── Tabs ─────────────────────────────────────────────────────── -->
-  <nav class="tabs-nav">
-    <button class="tab-btn active" data-tab="live">⚡ Live View</button>
-    <button class="tab-btn" data-tab="robots">Robots <span class="cnt" id="cnt-robots">0</span></button>
-    <button class="tab-btn" data-tab="locations">Locations <span class="cnt" id="cnt-locations">0</span></button>
-    <button class="tab-btn" data-tab="products">Products <span class="cnt" id="cnt-products">0</span></button>
-    <button class="tab-btn" data-tab="inventory">Inventory <span class="cnt" id="cnt-inventory">0</span></button>
-    <button class="tab-btn" data-tab="scanlogs">Scan Logs <span class="cnt" id="cnt-scanlogs">0</span></button>
-    <button class="tab-btn" data-tab="camera">📷 Robot Camera</button>
-  </nav>
+<!-- ── Tabs ─────────────────────────────────────────────────────── -->
+<nav class="tabs-nav">
+  <button class="tab-btn active" data-tab="live">⚡ Live View</button>
+  <button class="tab-btn" data-tab="robots">Robots <span class="cnt" id="cnt-robots">0</span></button>
+  <button class="tab-btn" data-tab="locations">Locations <span class="cnt" id="cnt-locations">0</span></button>
+  <button class="tab-btn" data-tab="products">Products <span class="cnt" id="cnt-products">0</span></button>
+  <button class="tab-btn" data-tab="inventory">Inventory <span class="cnt" id="cnt-inventory">0</span></button>
+  <button class="tab-btn" data-tab="scanlogs">Scan Logs <span class="cnt" id="cnt-scanlogs">0</span></button>
+  <button class="tab-btn" data-tab="camera">📷 Robot Camera</button>
+  <button class="tab-btn" data-tab="amr">🤖 AMR Control</button>
+</nav>
 
-  <!-- ══════════════════════════════════════════════════════════════
+<!-- ══════════════════════════════════════════════════════════════
      LIVE VIEW
 ════════════════════════════════════════════════════════════════ -->
-  <div class="tab-panel active" id="tab-live">
+<div class="tab-panel active" id="tab-live">
 
-    <div class="spotlight-wrap">
+  <div class="spotlight-wrap">
 
-      <!-- Spotlight card -->
-      <div class="spotlight" id="spotlight">
-        <div class="spot-empty" id="spot-empty">
-          <div class="spot-empty-icon">📡</div>
-          <div class="spot-empty-txt">Waiting for robot scan…</div>
+    <!-- Spotlight card -->
+    <div class="spotlight" id="spotlight">
+      <div class="spot-empty" id="spot-empty">
+        <div class="spot-empty-icon">📡</div>
+        <div class="spot-empty-txt">Waiting for robot scan…</div>
+      </div>
+      <div class="scan-card" id="scan-card" style="display:none">
+        <div class="card-row">
+          <div class="card-label">Robot</div>
+          <div>
+            <div class="card-value robot" id="v-robot">—</div>
+          </div>
         </div>
-        <div class="scan-card" id="scan-card" style="display:none">
-          <div class="card-row">
-            <div class="card-label">Robot</div>
-            <div>
-              <div class="card-value robot" id="v-robot">—</div>
-            </div>
+        <div class="card-row">
+          <div class="card-label">Location</div>
+          <div>
+            <div class="card-value loc" id="v-loc">—</div>
+            <div class="card-sub" id="v-rack"></div>
           </div>
-          <div class="card-row">
-            <div class="card-label">Location</div>
-            <div>
-              <div class="card-value loc" id="v-loc">—</div>
-              <div class="card-sub" id="v-rack"></div>
-            </div>
+        </div>
+        <div class="card-row">
+          <div class="card-label">Product</div>
+          <div>
+            <div class="card-value prod" id="v-prod">—</div>
+            <div class="card-sub" id="v-cat"></div>
           </div>
-          <div class="card-row">
-            <div class="card-label">Product</div>
-            <div>
-              <div class="card-value prod" id="v-prod">—</div>
-              <div class="card-sub" id="v-cat"></div>
-            </div>
-          </div>
-          <div class="card-row">
-            <div class="card-label">Quantity</div>
-            <div class="card-value qty" id="v-qty">—</div>
-          </div>
-          <div class="scan-time-bar">
-            <div class="scan-time-lbl">Scan ID</div>
-            <div class="scan-time-val" id="v-id">—</div>
-            <div class="scan-time-lbl">Time</div>
-            <div class="scan-time-val" id="v-time">—</div>
-          </div>
+        </div>
+        <div class="card-row">
+          <div class="card-label">Quantity</div>
+          <div class="card-value qty" id="v-qty">—</div>
+        </div>
+        <div class="scan-time-bar">
+          <div class="scan-time-lbl">Scan ID</div>
+          <div class="scan-time-val" id="v-id">—</div>
+          <div class="scan-time-lbl">Time</div>
+          <div class="scan-time-val" id="v-time">—</div>
         </div>
       </div>
+    </div>
 
-      <!-- Stats -->
-      <div class="stat-stack">
-        <div class="stat-box">
-          <div class="stat-lbl">Total Scans (session)</div>
-          <div class="stat-val" id="s-total">0</div>
-          <div class="stat-sub">in feed</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-lbl">Active Robots</div>
-          <div class="stat-val g" id="s-robots">0</div>
-          <div class="stat-sub">unique robot_code</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-lbl">Locations Visited</div>
-          <div class="stat-val" id="s-locs">0</div>
-          <div class="stat-sub">unique qr_code</div>
-        </div>
+    <!-- Stats -->
+    <div class="stat-stack">
+      <div class="stat-box">
+        <div class="stat-lbl">Total Scans (session)</div>
+        <div class="stat-val" id="s-total">0</div>
+        <div class="stat-sub">in feed</div>
       </div>
-
-    </div>
-
-    <!-- History feed -->
-    <div class="feed-header">
-      <div class="feed-title">Scan History</div>
-      <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">20 most recent · real-time</span>
-    </div>
-    <div class="feed-grid" id="feed-grid">
-      <div
-        style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);font-family:var(--mono);font-size:11px">
-        <span class="spinner"></span>Connecting to server…
+      <div class="stat-box">
+        <div class="stat-lbl">Active Robots</div>
+        <div class="stat-val g" id="s-robots">0</div>
+        <div class="stat-sub">unique robot_code</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-lbl">Locations Visited</div>
+        <div class="stat-val" id="s-locs">0</div>
+        <div class="stat-sub">unique qr_code</div>
       </div>
     </div>
 
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════
+  <!-- History feed -->
+  <div class="feed-header">
+    <div class="feed-title">Scan History</div>
+    <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">20 most recent · real-time</span>
+  </div>
+  <div class="feed-grid" id="feed-grid">
+    <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);font-family:var(--mono);font-size:11px">
+      <span class="spinner"></span>Connecting to server…
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
      ROBOTS
 ════════════════════════════════════════════════════════════════ -->
-  <div class="tab-panel" id="tab-robots">
-    <div class="crud-panel">
-      <div class="panel-header">
-        <div class="panel-title">Robots</div>
-        <button class="btn btn-primary btn-sm" onclick="openAdd('robots')">+ Add Robot</button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Robot Code</th>
-              <th>Description</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="body-robots">
-            <tr class="state-row">
-              <td colspan="4"><span class="spinner"></span>Loading…</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+<div class="tab-panel" id="tab-robots">
+  <div class="crud-panel">
+    <div class="panel-header">
+      <div class="panel-title">Robots</div>
+      <button class="btn btn-primary btn-sm" onclick="openAdd('robots')">+ Add Robot</button>
+    </div>
+    <div class="table-wrap">
+      <table><thead><tr><th>#</th><th>Robot Code</th><th>Description</th><th></th></tr></thead>
+      <tbody id="body-robots"><tr class="state-row"><td colspan="4"><span class="spinner"></span>Loading…</td></tr></tbody></table>
     </div>
   </div>
+</div>
 
-  <!-- ══════════════════════════════════════════════════════════════
+<!-- ══════════════════════════════════════════════════════════════
      LOCATIONS
 ════════════════════════════════════════════════════════════════ -->
-  <div class="tab-panel" id="tab-locations">
-    <div class="crud-panel">
-      <div class="panel-header">
-        <div class="panel-title">Rack Locations</div>
-        <button class="btn btn-primary btn-sm" onclick="openAdd('locations')">+ Add Location</button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Location Code</th>
-              <th>Rack</th>
-              <th>Slot</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="body-locations">
-            <tr class="state-row">
-              <td colspan="5"><span class="spinner"></span>Loading…</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+<div class="tab-panel" id="tab-locations">
+  <div class="crud-panel">
+    <div class="panel-header">
+      <div class="panel-title">Rack Locations</div>
+      <button class="btn btn-primary btn-sm" onclick="openAdd('locations')">+ Add Location</button>
+    </div>
+    <div class="table-wrap">
+      <table><thead><tr><th>#</th><th>Location Code</th><th>Rack</th><th>Slot</th><th></th></tr></thead>
+      <tbody id="body-locations"><tr class="state-row"><td colspan="5"><span class="spinner"></span>Loading…</td></tr></tbody></table>
     </div>
   </div>
+</div>
 
-  <!-- ══════════════════════════════════════════════════════════════
+<!-- ══════════════════════════════════════════════════════════════
      PRODUCTS
 ════════════════════════════════════════════════════════════════ -->
-  <div class="tab-panel" id="tab-products">
-    <div class="crud-panel">
-      <div class="panel-header">
-        <div class="panel-title">Products</div>
-        <button class="btn btn-primary btn-sm" onclick="openAdd('products')">+ Add Product</button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Product Code</th>
-              <th>Name</th>
-              <th>Category</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="body-products">
-            <tr class="state-row">
-              <td colspan="5"><span class="spinner"></span>Loading…</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+<div class="tab-panel" id="tab-products">
+  <div class="crud-panel">
+    <div class="panel-header">
+      <div class="panel-title">Products</div>
+      <button class="btn btn-primary btn-sm" onclick="openAdd('products')">+ Add Product</button>
+    </div>
+    <div class="table-wrap">
+      <table><thead><tr><th>#</th><th>Product Code</th><th>Name</th><th>Category</th><th></th></tr></thead>
+      <tbody id="body-products"><tr class="state-row"><td colspan="5"><span class="spinner"></span>Loading…</td></tr></tbody></table>
     </div>
   </div>
+</div>
 
-  <!-- ══════════════════════════════════════════════════════════════
+<!-- ══════════════════════════════════════════════════════════════
      INVENTORY
 ════════════════════════════════════════════════════════════════ -->
-  <div class="tab-panel" id="tab-inventory">
-    <div class="crud-panel">
-      <div class="panel-header">
-        <div class="panel-title">Inventory</div>
-        <button class="btn btn-primary btn-sm" onclick="openAdd('inventory')">+ Add Entry</button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Product</th>
-              <th>Location</th>
-              <th>Rack/Slot</th>
-              <th>Qty</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="body-inventory">
-            <tr class="state-row">
-              <td colspan="6"><span class="spinner"></span>Loading…</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+<div class="tab-panel" id="tab-inventory">
+  <div class="crud-panel">
+    <div class="panel-header">
+      <div class="panel-title">Inventory</div>
+      <button class="btn btn-primary btn-sm" onclick="openAdd('inventory')">+ Add Entry</button>
+    </div>
+    <div class="table-wrap">
+      <table><thead><tr><th>#</th><th>Product</th><th>Location</th><th>Rack/Slot</th><th>Qty</th><th></th></tr></thead>
+      <tbody id="body-inventory"><tr class="state-row"><td colspan="6"><span class="spinner"></span>Loading…</td></tr></tbody></table>
     </div>
   </div>
+</div>
 
-  <!-- ══════════════════════════════════════════════════════════════
+<!-- ══════════════════════════════════════════════════════════════
      SCAN LOGS
 ════════════════════════════════════════════════════════════════ -->
-  <div class="tab-panel" id="tab-scanlogs">
-    <div class="crud-panel">
-      <div class="panel-header">
-        <div class="panel-title">Scan Logs</div>
-        <button class="btn btn-primary btn-sm" onclick="openAdd('scanlogs')">+ Add</button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Robot</th>
-              <th>QR Code</th>
-              <th>Time</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="body-scanlogs">
-            <tr class="state-row">
-              <td colspan="5"><span class="spinner"></span>Loading…</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+<div class="tab-panel" id="tab-scanlogs">
+  <div class="crud-panel">
+    <div class="panel-header">
+      <div class="panel-title">Scan Logs</div>
+      <button class="btn btn-primary btn-sm" onclick="openAdd('scanlogs')">+ Add</button>
+    </div>
+    <div class="table-wrap">
+      <table><thead><tr><th>#</th><th>Robot</th><th>QR Code</th><th>Time</th><th></th></tr></thead>
+      <tbody id="body-scanlogs"><tr class="state-row"><td colspan="5"><span class="spinner"></span>Loading…</td></tr></tbody></table>
     </div>
   </div>
+</div>
 
-  <!-- ══════════════════════════════════════════════════════════════
+<!-- ══════════════════════════════════════════════════════════════
      ROBOT CAMERA
 ════════════════════════════════════════════════════════════════ -->
-  <div class="tab-panel" id="tab-camera">
-    <div class="crud-panel">
+<div class="tab-panel" id="tab-camera">
+  <div class="crud-panel">
 
-      <!-- Title + controls row -->
-      <div class="panel-header">
-        <div class="panel-title">Robot Live Camera</div>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <!-- Title + controls row -->
+    <div class="panel-header">
+      <div class="panel-title">Robot Live Camera</div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
 
-          <!-- Status badge -->
-          <div id="cam-status-badge" class="cam-badge offline">
-            <span class="cam-dot"></span>
-            <span id="cam-status-txt">Camera Offline</span>
+        <!-- Status badge -->
+        <div id="cam-status-badge" class="cam-badge offline">
+          <span class="cam-dot"></span>
+          <span id="cam-status-txt">Camera Offline</span>
+        </div>
+
+        <!-- Buttons -->
+        <button class="btn btn-primary btn-sm" id="btn-start-cam" onclick="startCamera()">▶ Start Camera</button>
+        <button class="btn btn-ghost   btn-sm" id="btn-stop-cam"  onclick="stopCamera()" disabled>■ Stop Camera</button>
+      </div>
+    </div>
+
+    <!-- Stream URL bar (editable so user can paste the real Pi URL later) -->
+    <div class="cam-url-bar">
+      <span class="cam-url-lbl">Stream URL</span>
+      <input id="cam-url-input" type="text" value="http://RASPBERRY_PI_IP:5000/video"
+             placeholder="http://192.168.x.x:5000/video"
+             spellcheck="false"/>
+      <button class="btn btn-ghost btn-sm" onclick="applyUrl()">Apply</button>
+    </div>
+
+    <!-- Video window -->
+    <div class="cam-window" id="cam-window">
+
+      <!-- Idle state (before Start is pressed) -->
+      <div class="cam-state" id="cam-idle">
+        <div class="cam-state-icon">📷</div>
+        <div class="cam-state-title">Camera Stopped</div>
+        <div class="cam-state-sub">Press <strong>Start Camera</strong> to load the stream</div>
+      </div>
+
+      <!-- Loading state -->
+      <div class="cam-state" id="cam-loading" style="display:none">
+        <div class="cam-spinner"></div>
+        <div class="cam-state-title">Connecting to camera…</div>
+        <div class="cam-state-sub" id="cam-loading-url"></div>
+      </div>
+
+      <!-- Error state -->
+      <div class="cam-state" id="cam-error" style="display:none">
+        <div class="cam-state-icon" style="color:var(--red)">⚠</div>
+        <div class="cam-state-title" style="color:var(--red)">Camera Offline</div>
+        <div class="cam-state-sub" id="cam-error-msg">Could not connect to the stream URL.</div>
+        <button class="btn btn-primary btn-sm" style="margin-top:14px" onclick="startCamera()">Retry</button>
+      </div>
+
+      <!-- Live feed — hidden until stream loads -->
+      <img id="cam-img"
+           style="display:none;width:100%;height:100%;object-fit:contain"
+           alt="Robot camera feed"
+           onload="onCamLoad()"
+           onerror="onCamError()"/>
+    </div>
+
+    <!-- Footer info -->
+    <div class="cam-footer">
+      <span id="cam-footer-info" style="color:var(--muted)">No stream active</span>
+      <span style="color:var(--muted)">MJPEG stream · auto-scales to window</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     AMR CONTROL TAB
+════════════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-amr">
+
+  <!-- ROS Connection bar -->
+  <div class="ros-bar">
+    <div class="ros-dot" id="ros-dot"></div>
+    <input id="ros-ip" value="192.168.1.250" placeholder="ROS Bridge IP"/>
+    <button class="amr-btn amr-btn-accent" onclick="rosConnect()">Connect</button>
+    <button class="amr-btn amr-btn-ghost"  onclick="rosDisconnect()">Disconnect</button>
+    <span class="ros-status-txt" id="ros-status-txt">Not connected</span>
+  </div>
+
+  <div class="amr-layout">
+
+    <!-- ── LEFT COLUMN: Controls ─────────────────────────────── -->
+    <div class="amr-col">
+
+      <!-- Mode Selector -->
+      <div class="amr-card">
+        <div class="amr-card-hdr">
+          <div class="amr-card-title">Operating Mode</div>
+        </div>
+        <div class="amr-card-body" style="padding:8px">
+          <div class="mode-toggle">
+            <button class="mode-btn active-manual" id="mode-manual-btn" onclick="setMode('manual')">🎮 Manual</button>
+            <button class="mode-btn" id="mode-auto-btn"   onclick="setMode('auto')">🤖 Auto Nav</button>
           </div>
-
-          <!-- Buttons -->
-          <button class="btn btn-primary btn-sm" id="btn-start-cam" onclick="startCamera()">▶ Start Camera</button>
-          <button class="btn btn-ghost   btn-sm" id="btn-stop-cam" onclick="stopCamera()" disabled>■ Stop
-            Camera</button>
         </div>
       </div>
 
-      <!-- Stream URL bar (editable so user can paste the real Pi URL later) -->
-      <div class="cam-url-bar">
-        <span class="cam-url-lbl">Stream URL</span>
-        <input id="cam-url-input" type="text" value="http://RASPBERRY_PI_IP:5000/video"
-          placeholder="http://192.168.x.x:5000/video" spellcheck="false" />
-        <button class="btn btn-ghost btn-sm" onclick="applyUrl()">Apply</button>
+      <!-- EMERGENCY STOP -->
+      <button class="estop-btn" onclick="emergencyStop()">🛑 EMERGENCY STOP</button>
+
+      <!-- Teleop -->
+      <div class="amr-card">
+        <div class="amr-card-hdr">
+          <div class="amr-card-title">Manual Teleop</div>
+          <span id="teleop-mode-lbl" style="font-family:var(--mono);font-size:9px;color:var(--green)">ACTIVE</span>
+        </div>
+        <div class="amr-card-body">
+          <div class="teleop-grid">
+            <div></div>
+            <button class="t-btn" id="t-fwd"  onmousedown="teleopStart(1,0)"  onmouseup="teleopStop()" ontouchstart="teleopStart(1,0)" ontouchend="teleopStop()">▲</button>
+            <div></div>
+            <button class="t-btn" id="t-left" onmousedown="teleopStart(0,1)"  onmouseup="teleopStop()" ontouchstart="teleopStart(0,1)" ontouchend="teleopStop()">◀</button>
+            <button class="t-btn stop-btn"    onclick="emergencyStop()">■</button>
+            <button class="t-btn" id="t-right" onmousedown="teleopStart(0,-1)" onmouseup="teleopStop()" ontouchstart="teleopStart(0,-1)" ontouchend="teleopStop()">▶</button>
+            <div></div>
+            <button class="t-btn" id="t-bwd"  onmousedown="teleopStart(-1,0)" onmouseup="teleopStop()" ontouchstart="teleopStart(-1,0)" ontouchend="teleopStop()">▼</button>
+            <div></div>
+          </div>
+          <div class="speed-row">
+            <label>Linear</label>
+            <input type="range" id="sl-linear"  min="0.02" max="0.40" step="0.01" value="0.15" oninput="updateSpeedLabel()"/>
+            <span class="speed-val" id="lbl-linear">0.15</span>
+          </div>
+          <div class="speed-row">
+            <label>Angular</label>
+            <input type="range" id="sl-angular" min="0.1"  max="2.0"  step="0.05" value="0.8"  oninput="updateSpeedLabel()"/>
+            <span class="speed-val" id="lbl-angular">0.80</span>
+          </div>
+        </div>
       </div>
 
-      <!-- Video window -->
-      <div class="cam-window" id="cam-window">
-
-        <!-- Idle state (before Start is pressed) -->
-        <div class="cam-state" id="cam-idle">
-          <div class="cam-state-icon">📷</div>
-          <div class="cam-state-title">Camera Stopped</div>
-          <div class="cam-state-sub">Press <strong>Start Camera</strong> to load the stream</div>
+      <!-- Preset waypoints (quick navigation) -->
+      <div class="amr-card">
+        <div class="amr-card-hdr">
+          <div class="amr-card-title">Quick Nav — Presets</div>
         </div>
-
-        <!-- Loading state -->
-        <div class="cam-state" id="cam-loading" style="display:none">
-          <div class="cam-spinner"></div>
-          <div class="cam-state-title">Connecting to camera…</div>
-          <div class="cam-state-sub" id="cam-loading-url"></div>
+        <div class="amr-card-body">
+          <div class="wp-preset-grid" id="preset-list">
+            <!-- populated by JS -->
+          </div>
+          <div style="margin-top:8px">
+            <button class="amr-btn amr-btn-ghost amr-btn-full" onclick="setInitialPose()">📍 Set Initial Pose (HOME)</button>
+          </div>
         </div>
-
-        <!-- Error state -->
-        <div class="cam-state" id="cam-error" style="display:none">
-          <div class="cam-state-icon" style="color:var(--red)">⚠</div>
-          <div class="cam-state-title" style="color:var(--red)">Camera Offline</div>
-          <div class="cam-state-sub" id="cam-error-msg">Could not connect to the stream URL.</div>
-          <button class="btn btn-primary btn-sm" style="margin-top:14px" onclick="startCamera()">Retry</button>
-        </div>
-
-        <!-- Live feed — hidden until stream loads -->
-        <img id="cam-img" style="display:none;width:100%;height:100%;object-fit:contain" alt="Robot camera feed"
-          onload="onCamLoad()" onerror="onCamError()" />
       </div>
 
-      <!-- Footer info -->
-      <div class="cam-footer">
-        <span id="cam-footer-info" style="color:var(--muted)">No stream active</span>
-        <span style="color:var(--muted)">MJPEG stream · auto-scales to window</span>
+    </div>
+
+    <!-- ── CENTER COLUMN: Map ─────────────────────────────────── -->
+    <div class="amr-map-col">
+
+      <!-- Map toolbar -->
+      <div class="map-toolbar">
+        <button class="map-tool-btn active" id="tool-nav"   onclick="setTool('nav')">🎯 Nav Goal</button>
+        <button class="map-tool-btn"        id="tool-wp"    onclick="setTool('wp')">📌 Add Waypoint</button>
+        <button class="map-tool-btn"        id="tool-pan"   onclick="setTool('pan')">✋ Pan</button>
+        <span style="font-family:var(--mono);font-size:9px;color:var(--muted);padding:0 4px">|</span>
+        <button class="map-tool-btn" onclick="mapZoom(1.2)">＋</button>
+        <button class="map-tool-btn" onclick="mapZoom(0.8)">－</button>
+        <button class="map-tool-btn" onclick="mapResetView()">⊙ Fit</button>
+        <span style="font-family:var(--mono);font-size:9px;color:var(--muted);padding:0 4px">|</span>
+        <div class="toggle-row" style="gap:6px">
+          <label class="toggle-lbl">LiDAR</label>
+          <label class="toggle"><input type="checkbox" id="tog-lidar" checked onchange="toggleLayer('lidar',this.checked)"/><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row" style="gap:6px">
+          <label class="toggle-lbl">Path</label>
+          <label class="toggle"><input type="checkbox" id="tog-path" checked onchange="toggleLayer('path',this.checked)"/><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row" style="gap:6px">
+          <label class="toggle-lbl">History</label>
+          <label class="toggle"><input type="checkbox" id="tog-hist" checked onchange="toggleLayer('hist',this.checked)"/><span class="toggle-slider"></span></label>
+        </div>
+        <span class="map-hint" id="map-hint">Click map to set nav goal · Drag to set orientation</span>
+      </div>
+
+      <!-- Canvas map -->
+      <div id="amr-map-wrap">
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.1em;pointer-events:none" id="map-overlay-msg">
+          <div style="font-size:28px;opacity:.3">🗺️</div>
+          Connect to ROS to load map
+        </div>
+      </div>
+
+      <!-- Coordinate readout -->
+      <div class="map-coords">
+        <span id="map-coord-cur">Map X: — · Y: —</span>
+        <span id="map-coord-robot">Robot: — · —  ·  Yaw: —</span>
+      </div>
+
+    </div>
+
+    <!-- ── RIGHT COLUMN: Status + Tuning ─────────────────────── -->
+    <div class="amr-col">
+
+      <!-- Navigation Status -->
+      <div class="amr-card">
+        <div class="amr-card-hdr">
+          <div class="amr-card-title">Navigation Status</div>
+          <span id="nav-state-badge" class="ns-val idle">IDLE</span>
+        </div>
+        <div class="amr-card-body">
+          <div class="nav-status">
+            <div class="ns-box">
+              <div class="ns-lbl">Goal X</div>
+              <div class="ns-val" id="ns-gx">—</div>
+            </div>
+            <div class="ns-box">
+              <div class="ns-lbl">Goal Y</div>
+              <div class="ns-val" id="ns-gy">—</div>
+            </div>
+            <div class="ns-box">
+              <div class="ns-lbl">Distance</div>
+              <div class="ns-val" id="ns-dist">—</div>
+            </div>
+            <div class="ns-box">
+              <div class="ns-lbl">Progress</div>
+              <div class="ns-val" id="ns-prog">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mission Planner (multi-waypoint) -->
+      <div class="amr-card">
+        <div class="amr-card-hdr">
+          <div class="amr-card-title">Mission Planner</div>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--muted)" id="wp-count-lbl">0 points</span>
+        </div>
+        <div class="amr-card-body">
+          <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+            <button class="amr-btn amr-btn-green" onclick="startMission()" id="mission-start-btn">▶ Start Mission</button>
+            <button class="amr-btn amr-btn-ghost" onclick="stopMission()"  id="mission-stop-btn" disabled>■ Stop</button>
+            <button class="amr-btn amr-btn-danger"onclick="clearWaypoints()">✕ Clear</button>
+          </div>
+          <div class="wp-list" id="wp-list">
+            <div style="text-align:center;padding:16px;color:var(--muted);font-family:var(--mono);font-size:10px">
+              Switch to 📌 Add Waypoint mode then click the map
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- IMU -->
+      <div class="amr-card">
+        <div class="amr-card-hdr"><div class="amr-card-title">IMU — BNO055</div></div>
+        <div class="amr-card-body">
+          <div class="imu-grid">
+            <div class="imu-box">
+              <div class="imu-lbl">🧭 Yaw</div>
+              <div class="imu-val" id="imu-yaw-deg">0.00°</div>
+            </div>
+            <div class="imu-box">
+              <div class="imu-lbl">θ Theta (rad)</div>
+              <div class="imu-val" id="imu-yaw-rad" style="color:var(--red)">0.000</div>
+            </div>
+            <div class="imu-box">
+              <div class="imu-lbl">Robot X</div>
+              <div class="imu-val" id="imu-px" style="color:var(--green)">—</div>
+            </div>
+            <div class="imu-box">
+              <div class="imu-lbl">Robot Y</div>
+              <div class="imu-val" id="imu-py" style="color:var(--green)">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PID Tuning -->
+      <div class="amr-card">
+        <div class="amr-card-hdr">
+          <div class="amr-card-title">PID — STM32 Motor</div>
+        </div>
+        <div class="amr-card-body">
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <div style="flex:1">
+              <label style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Kp</label>
+              <div class="pid-row"><input type="number" id="pid-kp" value="700.0" step="10"/></div>
+            </div>
+            <div style="flex:1">
+              <label style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Ki</label>
+              <div class="pid-row"><input type="number" id="pid-ki" value="300.0" step="10"/></div>
+            </div>
+          </div>
+          <button class="amr-btn amr-btn-accent amr-btn-full" onclick="sendPID()">⚙ Upload PID to STM32</button>
+          <div style="display:flex;gap:6px;margin-top:8px;align-items:center">
+            <input type="number" id="test-speed-amr" value="0.20" step="0.05"
+              style="width:70px;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:12px;padding:6px;text-align:center;outline:none"/>
+            <button class="amr-btn amr-btn-green" style="flex:1" onclick="pidTestRun()">▲ Test Run</button>
+            <button class="amr-btn amr-btn-danger"style="flex:1" onclick="pidTestStop()">■ Stop</button>
+          </div>
+          <div style="margin-top:10px">
+            <div class="chart-box"><div class="chart-box-lbl">L-WHEEL  <span style="color:#e74c3c">— target</span>  <span style="color:#3b9eff">— actual</span></div><canvas id="chartAMR-L"></canvas></div>
+            <div class="chart-box" style="margin-top:6px"><div class="chart-box-lbl">R-WHEEL</div><canvas id="chartAMR-R"></canvas></div>
+          </div>
+        </div>
       </div>
 
     </div>
   </div>
+</div>
 
-  <!-- ══════════════════════════════════════════════════════════════
+<!-- ══════════════════════════════════════════════════════════════
      MODALS
 ════════════════════════════════════════════════════════════════ -->
-  <div class="modal-backdrop" id="form-modal">
-    <div class="modal" id="form-modal-inner">
-      <div class="modal-header">
-        <div class="modal-title" id="modal-title">Add</div>
-        <button class="modal-close" onclick="closeModal('form-modal')">×</button>
-      </div>
-      <div class="modal-body" id="modal-body"></div>
-      <div class="modal-footer">
-        <button class="btn btn-ghost" onclick="closeModal('form-modal')">Cancel</button>
-        <button class="btn btn-primary" id="modal-save" onclick="saveRecord()">Save</button>
-      </div>
+<div class="modal-backdrop" id="form-modal">
+  <div class="modal" id="form-modal-inner">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Add</div>
+      <button class="modal-close" onclick="closeModal('form-modal')">×</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('form-modal')">Cancel</button>
+      <button class="btn btn-primary" id="modal-save" onclick="saveRecord()">Save</button>
     </div>
   </div>
+</div>
 
-  <div class="modal-backdrop" id="del-modal">
-    <div class="modal danger">
-      <div class="modal-header">
-        <div class="modal-title danger">Confirm Delete</div>
-        <button class="modal-close" onclick="closeModal('del-modal')">×</button>
-      </div>
-      <div class="modal-body">
-        <p class="confirm-msg" id="del-msg"></p>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-ghost" onclick="closeModal('del-modal')">Cancel</button>
-        <button class="btn btn-danger" id="del-ok">Delete</button>
-      </div>
+<div class="modal-backdrop" id="del-modal">
+  <div class="modal danger">
+    <div class="modal-header">
+      <div class="modal-title danger">Confirm Delete</div>
+      <button class="modal-close" onclick="closeModal('del-modal')">×</button>
+    </div>
+    <div class="modal-body"><p class="confirm-msg" id="del-msg"></p></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('del-modal')">Cancel</button>
+      <button class="btn btn-danger" id="del-ok">Delete</button>
     </div>
   </div>
+</div>
 
-  <div id="toast"></div>
+<div id="toast"></div>
 
-  <!-- ══════════════════════════════════════════════════════════════
+<!-- ══════════════════════════════════════════════════════════════
      JAVASCRIPT
 ════════════════════════════════════════════════════════════════ -->
-  <script>
-    const API = 'http://localhost:8000';
-    const WS_URL = 'ws://localhost:8000/ws';
+<script>
+const API = 'http://localhost:8000';
+const WS_URL = 'ws://localhost:8000/ws';
 
-    /* ── State ─────────────────────────────────────────────────── */
-    let feed = [];          // array of enriched scan objects (max 20)
-    let _products = [];
-    let _locations = [];
-    let modalCtx = {};
-    let ws = null;
+/* ── State ─────────────────────────────────────────────────── */
+let feed       = [];          // array of enriched scan objects (max 20)
+let _products  = [];
+let _locations = [];
+let modalCtx   = {};
+let ws         = null;
 
-    /* ── Clock ─────────────────────────────────────────────────── */
-    setInterval(() => {
-      document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB');
-    }, 1000);
+/* ── Clock ─────────────────────────────────────────────────── */
+setInterval(() => {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB');
+}, 1000);
 
-    /* ── Tabs ──────────────────────────────────────────────────── */
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-      });
-    });
+/* ── Tabs ──────────────────────────────────────────────────── */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
 
-    /* ════════════════════════════════════════════════════════════
-       WEBSOCKET — real-time connection
-    ════════════════════════════════════════════════════════════ */
-    function connectWS() {
-      ws = new WebSocket(WS_URL);
+/* ════════════════════════════════════════════════════════════
+   WEBSOCKET — real-time connection
+════════════════════════════════════════════════════════════ */
+function connectWS() {
+  ws = new WebSocket(WS_URL);
 
-      ws.onopen = () => {
-        setWsBadge(true);
-        console.log('[WS] Connected');
-      };
+  ws.onopen = () => {
+    setWsBadge(true);
+    console.log('[WS] Connected');
+  };
 
-      ws.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
+  ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
 
-        if (msg.type === 'history') {
-          // Server sends last 20 scans on first connect
-          feed = msg.data || [];
-          renderFeed(false);
-          updateStats();
-        } else if (msg.type === 'scan') {
-          // New scan from robot — prepend to feed
-          feed.unshift(msg.data);
-          if (feed.length > 20) feed.pop();
-          updateSpotlight(msg.data, true);
-          renderFeed(true);
-          updateStats();
-        }
-      };
-
-      ws.onclose = () => {
-        setWsBadge(false);
-        console.log('[WS] Disconnected — retrying in 3s…');
-        setTimeout(connectWS, 3000);    // auto-reconnect
-      };
-
-      ws.onerror = () => {
-        ws.close();
-      };
+    if (msg.type === 'history') {
+      // Server sends last 20 scans on first connect
+      feed = msg.data || [];
+      renderFeed(false);
+      updateStats();
+    } else if (msg.type === 'scan') {
+      // New scan from robot — prepend to feed
+      feed.unshift(msg.data);
+      if (feed.length > 20) feed.pop();
+      updateSpotlight(msg.data, true);
+      renderFeed(true);
+      updateStats();
     }
+  };
 
-    function setWsBadge(online) {
-      const el = document.getElementById('ws-badge');
-      el.className = 'ws-badge ' + (online ? 'connected' : 'disconnected');
-      document.getElementById('ws-label').textContent = online ? 'LIVE' : 'OFFLINE';
-    }
+  ws.onclose = () => {
+    setWsBadge(false);
+    console.log('[WS] Disconnected — retrying in 3s…');
+    setTimeout(connectWS, 3000);    // auto-reconnect
+  };
 
-    /* ════════════════════════════════════════════════════════════
-       SPOTLIGHT — big card for the latest scan
-    ════════════════════════════════════════════════════════════ */
-    function updateSpotlight(d, animate = false) {
-      document.getElementById('spot-empty').style.display = 'none';
-      document.getElementById('scan-card').style.display = 'flex';
+  ws.onerror = () => {
+    ws.close();
+  };
+}
 
-      setText('v-robot', d.robot_code || '—', !!d.robot_code);
-      setText('v-loc', d.qr_code || '—', !!d.qr_code);
-      document.getElementById('v-rack').textContent =
-        (d.rack && d.slot) ? `Rack ${d.rack}  ·  Slot ${d.slot}` : '';
+function setWsBadge(online) {
+  const el = document.getElementById('ws-badge');
+  el.className = 'ws-badge ' + (online ? 'connected' : 'disconnected');
+  document.getElementById('ws-label').textContent = online ? 'LIVE' : 'OFFLINE';
+}
 
-      const hasProd = !!(d.product_name || d.product_code);
-      setText('v-prod', d.product_name || d.product_code || '—', hasProd);
-      document.getElementById('v-cat').textContent = d.category || '';
+/* ════════════════════════════════════════════════════════════
+   SPOTLIGHT — big card for the latest scan
+════════════════════════════════════════════════════════════ */
+function updateSpotlight(d, animate = false) {
+  document.getElementById('spot-empty').style.display = 'none';
+  document.getElementById('scan-card').style.display  = 'flex';
 
-      const hasQty = d.quantity != null;
-      const qtyEl = document.getElementById('v-qty');
-      qtyEl.textContent = hasQty ? d.quantity : 'N/A';
-      qtyEl.className = 'card-value qty' + (hasQty ? '' : ' na');
+  setText('v-robot', d.robot_code  || '—', !!d.robot_code);
+  setText('v-loc',   d.qr_code     || '—', !!d.qr_code);
+  document.getElementById('v-rack').textContent =
+    (d.rack && d.slot) ? `Rack ${d.rack}  ·  Slot ${d.slot}` : '';
 
-      document.getElementById('v-id').textContent = '#' + (d.id || '?');
-      document.getElementById('v-time').textContent = d.scan_time || '—';
+  const hasProd = !!(d.product_name || d.product_code);
+  setText('v-prod', d.product_name || d.product_code || '—', hasProd);
+  document.getElementById('v-cat').textContent = d.category || '';
 
-      if (animate) {
-        const sp = document.getElementById('spotlight');
-        sp.classList.remove('flash');
-        void sp.offsetWidth;  // reflow to restart animation
-        sp.classList.add('flash');
-      }
-    }
+  const hasQty = d.quantity != null;
+  const qtyEl  = document.getElementById('v-qty');
+  qtyEl.textContent  = hasQty ? d.quantity : 'N/A';
+  qtyEl.className    = 'card-value qty' + (hasQty ? '' : ' na');
 
-    function setText(id, val, hasData) {
-      const el = document.getElementById(id);
-      el.textContent = val;
-    }
+  document.getElementById('v-id').textContent   = '#' + (d.id || '?');
+  document.getElementById('v-time').textContent = d.scan_time || '—';
 
-    /* ════════════════════════════════════════════════════════════
-       HISTORY FEED — grid of small cards
-    ════════════════════════════════════════════════════════════ */
-    function renderFeed(highlightFirst = false) {
-      const grid = document.getElementById('feed-grid');
-      if (!feed.length) {
-        grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);font-family:var(--mono);font-size:11px">No scans yet.</div>`;
-        return;
-      }
-      grid.innerHTML = feed.map((d, i) => {
-        const isNew = highlightFirst && i === 0;
-        const prod = d.product_name || d.product_code;
-        const loc = d.qr_code;
-        return `
+  if (animate) {
+    const sp = document.getElementById('spotlight');
+    sp.classList.remove('flash');
+    void sp.offsetWidth;  // reflow to restart animation
+    sp.classList.add('flash');
+  }
+}
+
+function setText(id, val, hasData) {
+  const el = document.getElementById(id);
+  el.textContent = val;
+}
+
+/* ════════════════════════════════════════════════════════════
+   HISTORY FEED — grid of small cards
+════════════════════════════════════════════════════════════ */
+function renderFeed(highlightFirst = false) {
+  const grid = document.getElementById('feed-grid');
+  if (!feed.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);font-family:var(--mono);font-size:11px">No scans yet.</div>`;
+    return;
+  }
+  grid.innerHTML = feed.map((d, i) => {
+    const isNew = highlightFirst && i === 0;
+    const prod  = d.product_name || d.product_code;
+    const loc   = d.qr_code;
+    return `
     <div class="h-card${isNew ? ' new' : ''}">
       <div class="h-card-top">
         <span class="h-robot">${esc(d.robot_code || '—')}</span>
@@ -1581,118 +1333,118 @@
       </div>
       <div class="h-loc">${esc(loc || '—')}</div>
       ${prod
-            ? `<div class="h-prod">${esc(prod)}</div>
+        ? `<div class="h-prod">${esc(prod)}</div>
            <div class="h-qty">Qty: <span>${esc(d.quantity ?? 'N/A')}</span></div>`
-            : `<div class="h-na">No product linked</div>`
-          }
+        : `<div class="h-na">No product linked</div>`
+      }
     </div>`;
-      }).join('');
-    }
+  }).join('');
+}
 
-    function timeOnly(dt) {
-      if (!dt) return '—';
-      const parts = dt.split(' ');
-      return parts.length > 1 ? parts[1] : dt;
-    }
+function timeOnly(dt) {
+  if (!dt) return '—';
+  const parts = dt.split(' ');
+  return parts.length > 1 ? parts[1] : dt;
+}
 
-    /* ════════════════════════════════════════════════════════════
-       STATS
-    ════════════════════════════════════════════════════════════ */
-    function updateStats() {
-      document.getElementById('s-total').textContent = feed.length;
-      document.getElementById('s-robots').textContent = new Set(feed.map(r => r.robot_code)).size;
-      document.getElementById('s-locs').textContent = new Set(feed.map(r => r.qr_code)).size;
-    }
+/* ════════════════════════════════════════════════════════════
+   STATS
+════════════════════════════════════════════════════════════ */
+function updateStats() {
+  document.getElementById('s-total').textContent  = feed.length;
+  document.getElementById('s-robots').textContent = new Set(feed.map(r => r.robot_code)).size;
+  document.getElementById('s-locs').textContent   = new Set(feed.map(r => r.qr_code)).size;
+}
 
-    /* ════════════════════════════════════════════════════════════
-       CRUD — fetch & render tables
-    ════════════════════════════════════════════════════════════ */
-    async function api(path, opts = {}) {
-      const res = await fetch(API + path, { headers: { 'Content-Type': 'application/json' }, ...opts });
-      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || `HTTP ${res.status}`); }
-      return res.json();
-    }
+/* ════════════════════════════════════════════════════════════
+   CRUD — fetch & render tables
+════════════════════════════════════════════════════════════ */
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, {headers:{'Content-Type':'application/json'}, ...opts});
+  if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.detail || `HTTP ${res.status}`); }
+  return res.json();
+}
 
-    async function loadCrud() {
-      try {
-        const [robots, locs, prods, inv, logs] = await Promise.all([
-          api('/robots'), api('/locations'), api('/products'), api('/inventory'), api('/scanlogs'),
-        ]);
-        _products = prods;
-        _locations = locs;
-        renderRobots(robots);
-        renderLocations(locs);
-        renderProducts(prods);
-        renderInventory(inv);
-        renderScanlogs(logs);
-      } catch (e) { console.error('CRUD load failed:', e); }
-    }
+async function loadCrud() {
+  try {
+    const [robots, locs, prods, inv, logs] = await Promise.all([
+      api('/robots'), api('/locations'), api('/products'), api('/inventory'), api('/scanlogs'),
+    ]);
+    _products  = prods;
+    _locations = locs;
+    renderRobots(robots);
+    renderLocations(locs);
+    renderProducts(prods);
+    renderInventory(inv);
+    renderScanlogs(logs);
+  } catch(e) { console.error('CRUD load failed:', e); }
+}
 
-    function renderRobots(data) {
-      setCount('cnt-robots', data.length);
-      const tb = document.getElementById('body-robots');
-      if (!data.length) { emptyRow(tb, 4); return; }
-      tb.innerHTML = data.map(r => `<tr>
+function renderRobots(data) {
+  setCount('cnt-robots', data.length);
+  const tb = document.getElementById('body-robots');
+  if (!data.length) { emptyRow(tb, 4); return; }
+  tb.innerHTML = data.map(r => `<tr>
     <td class="id">${esc(r.id)}</td>
     <td class="code">${esc(r.robot_code)}</td>
-    <td>${esc(r.description ?? '—')}</td>
+    <td>${esc(r.description??'—')}</td>
     <td class="acts">
       <button class="btn btn-ghost btn-sm" onclick='openEdit("robots",${r.id},${jq(r)})'>Edit</button>
       <button class="btn btn-danger btn-sm" onclick='confirmDel("robots",${r.id},"${esc(r.robot_code)}")'>Del</button>
     </td></tr>`).join('');
-    }
+}
 
-    function renderLocations(data) {
-      setCount('cnt-locations', data.length);
-      const tb = document.getElementById('body-locations');
-      if (!data.length) { emptyRow(tb, 5); return; }
-      tb.innerHTML = data.map(r => `<tr>
+function renderLocations(data) {
+  setCount('cnt-locations', data.length);
+  const tb = document.getElementById('body-locations');
+  if (!data.length) { emptyRow(tb, 5); return; }
+  tb.innerHTML = data.map(r => `<tr>
     <td class="id">${esc(r.id)}</td>
     <td class="code">${esc(r.location_code)}</td>
-    <td>${esc(r.rack ?? '—')}</td>
-    <td>${esc(r.slot ?? '—')}</td>
+    <td>${esc(r.rack??'—')}</td>
+    <td>${esc(r.slot??'—')}</td>
     <td class="acts">
       <button class="btn btn-ghost btn-sm" onclick='openEdit("locations",${r.id},${jq(r)})'>Edit</button>
       <button class="btn btn-danger btn-sm" onclick='confirmDel("locations",${r.id},"${esc(r.location_code)}")'>Del</button>
     </td></tr>`).join('');
-    }
+}
 
-    function renderProducts(data) {
-      setCount('cnt-products', data.length);
-      const tb = document.getElementById('body-products');
-      if (!data.length) { emptyRow(tb, 5); return; }
-      tb.innerHTML = data.map(r => `<tr>
+function renderProducts(data) {
+  setCount('cnt-products', data.length);
+  const tb = document.getElementById('body-products');
+  if (!data.length) { emptyRow(tb, 5); return; }
+  tb.innerHTML = data.map(r => `<tr>
     <td class="id">${esc(r.id)}</td>
     <td class="code">${esc(r.product_code)}</td>
-    <td>${esc(r.name ?? '—')}</td>
-    <td>${esc(r.category ?? '—')}</td>
+    <td>${esc(r.name??'—')}</td>
+    <td>${esc(r.category??'—')}</td>
     <td class="acts">
       <button class="btn btn-ghost btn-sm" onclick='openEdit("products",${r.id},${jq(r)})'>Edit</button>
       <button class="btn btn-danger btn-sm" onclick='confirmDel("products",${r.id},"${esc(r.product_code)}")'>Del</button>
     </td></tr>`).join('');
-    }
+}
 
-    function renderInventory(data) {
-      setCount('cnt-inventory', data.length);
-      const tb = document.getElementById('body-inventory');
-      if (!data.length) { emptyRow(tb, 6); return; }
-      tb.innerHTML = data.map(r => `<tr>
+function renderInventory(data) {
+  setCount('cnt-inventory', data.length);
+  const tb = document.getElementById('body-inventory');
+  if (!data.length) { emptyRow(tb, 6); return; }
+  tb.innerHTML = data.map(r => `<tr>
     <td class="id">${esc(r.id)}</td>
-    <td class="code">${esc(r.product_code ?? '—')} <small style="color:var(--muted)">${esc(r.product_name ?? '')}</small></td>
-    <td>${esc(r.location_code ?? '—')}</td>
-    <td style="color:var(--muted)">${esc(r.rack ?? '')}/${esc(r.slot ?? '')}</td>
+    <td class="code">${esc(r.product_code??'—')} <small style="color:var(--muted)">${esc(r.product_name??'')}</small></td>
+    <td>${esc(r.location_code??'—')}</td>
+    <td style="color:var(--muted)">${esc(r.rack??'')}/${esc(r.slot??'')}</td>
     <td class="qty">${esc(r.quantity)}</td>
     <td class="acts">
       <button class="btn btn-ghost btn-sm" onclick='openEdit("inventory",${r.id},${jq(r)})'>Edit</button>
       <button class="btn btn-danger btn-sm" onclick='confirmDel("inventory",${r.id},"inventory #${r.id}")'>Del</button>
     </td></tr>`).join('');
-    }
+}
 
-    function renderScanlogs(data) {
-      setCount('cnt-scanlogs', data.length);
-      const tb = document.getElementById('body-scanlogs');
-      if (!data.length) { emptyRow(tb, 5); return; }
-      tb.innerHTML = data.map(r => `<tr>
+function renderScanlogs(data) {
+  setCount('cnt-scanlogs', data.length);
+  const tb = document.getElementById('body-scanlogs');
+  if (!data.length) { emptyRow(tb, 5); return; }
+  tb.innerHTML = data.map(r => `<tr>
     <td class="id">${esc(r.id)}</td>
     <td class="robot">${esc(r.robot_code)}</td>
     <td class="code">${esc(r.qr_code)}</td>
@@ -1700,278 +1452,1245 @@
     <td class="acts">
       <button class="btn btn-danger btn-sm" onclick='confirmDel("scanlogs",${r.id},"scan #${r.id}")'>Del</button>
     </td></tr>`).join('');
-    }
+}
 
-    function setCount(id, n) { document.getElementById(id).textContent = n; }
-    function emptyRow(tb, cols) {
-      tb.innerHTML = `<tr class="state-row"><td colspan="${cols}">No records.</td></tr>`;
-    }
+function setCount(id, n) { document.getElementById(id).textContent = n; }
+function emptyRow(tb, cols) {
+  tb.innerHTML = `<tr class="state-row"><td colspan="${cols}">No records.</td></tr>`;
+}
 
-    /* ════════════════════════════════════════════════════════════
-       MODAL FORMS
-    ════════════════════════════════════════════════════════════ */
-    const FORMS = {
-      robots: () => `<div class="form-grid">
+/* ════════════════════════════════════════════════════════════
+   MODAL FORMS
+════════════════════════════════════════════════════════════ */
+const FORMS = {
+  robots: () => `<div class="form-grid">
     <div class="field full"><label>Robot Code *</label><input id="f0" placeholder="AMR_01"/></div>
     <div class="field full"><label>Description</label><input id="f1" placeholder="Main floor robot"/></div>
   </div>`,
 
-      locations: () => `<div class="form-grid">
+  locations: () => `<div class="form-grid">
     <div class="field full"><label>Location Code *</label><input id="f0" placeholder="RACK_A_01"/></div>
     <div class="field"><label>Rack</label><input id="f1" placeholder="A"/></div>
     <div class="field"><label>Slot</label><input id="f2" placeholder="01"/></div>
   </div>`,
 
-      products: () => `<div class="form-grid">
+  products: () => `<div class="form-grid">
     <div class="field full"><label>Product Code *</label><input id="f0" placeholder="PROD-001"/></div>
     <div class="field full"><label>Name</label><input id="f1" placeholder="Motor"/></div>
     <div class="field full"><label>Category</label><input id="f2" placeholder="Electronics"/></div>
   </div>`,
 
-      inventory: () => {
-        const pOpts = _products.map(p => `<option value="${p.id}">${esc(p.product_code)} — ${esc(p.name ?? '')}</option>`).join('');
-        const lOpts = _locations.map(l => `<option value="${l.id}">${esc(l.location_code)} (${esc(l.rack)}/${esc(l.slot)})</option>`).join('');
-        return `<div class="form-grid one">
+  inventory: () => {
+    const pOpts = _products.map(p => `<option value="${p.id}">${esc(p.product_code)} — ${esc(p.name??'')}</option>`).join('');
+    const lOpts = _locations.map(l => `<option value="${l.id}">${esc(l.location_code)} (${esc(l.rack)}/${esc(l.slot)})</option>`).join('');
+    return `<div class="form-grid one">
       <div class="field"><label>Product *</label><select id="f0"><option value="">— select —</option>${pOpts}</select></div>
       <div class="field"><label>Location *</label><select id="f1"><option value="">— select —</option>${lOpts}</select></div>
       <div class="field"><label>Quantity *</label><input id="f2" type="number" min="0" placeholder="0"/></div>
     </div>`;
-      },
+  },
 
-      scanlogs: () => `<div class="form-grid">
+  scanlogs: () => `<div class="form-grid">
     <div class="field full"><label>Robot Code *</label><input id="f0" placeholder="AMR_01"/></div>
     <div class="field full"><label>QR Code *</label><input id="f1" placeholder="RACK_A_01"/></div>
   </div>`,
-    };
+};
 
-    function openAdd(table) {
-      modalCtx = { table, mode: 'add', id: null };
-      document.getElementById('modal-title').textContent = 'Add — ' + table;
-      document.getElementById('modal-body').innerHTML = FORMS[table]();
-      document.getElementById('modal-save').textContent = 'Create';
-      document.getElementById('form-modal').classList.add('open');
+function openAdd(table) {
+  modalCtx = { table, mode: 'add', id: null };
+  document.getElementById('modal-title').textContent = 'Add — ' + table;
+  document.getElementById('modal-body').innerHTML = FORMS[table]();
+  document.getElementById('modal-save').textContent = 'Create';
+  document.getElementById('form-modal').classList.add('open');
+}
+
+function openEdit(table, id, row) {
+  modalCtx = { table, mode: 'edit', id };
+  document.getElementById('modal-title').textContent = 'Edit — ' + table + ' #' + id;
+  document.getElementById('modal-body').innerHTML = FORMS[table]();
+  document.getElementById('modal-save').textContent = 'Update';
+  document.getElementById('form-modal').classList.add('open');
+  // pre-fill
+  const fill = (fid, v) => { const el=document.getElementById(fid); if(el) el.value = v??''; };
+  if (table==='robots')     { fill('f0',row.robot_code);   fill('f1',row.description); }
+  if (table==='locations')  { fill('f0',row.location_code);fill('f1',row.rack);fill('f2',row.slot); }
+  if (table==='products')   { fill('f0',row.product_code); fill('f1',row.name);fill('f2',row.category); }
+  if (table==='inventory')  { fill('f0',row.product_id);   fill('f1',row.location_id);fill('f2',row.quantity); }
+  if (table==='scanlogs')   { fill('f0',row.robot_code);   fill('f1',row.qr_code); }
+}
+
+function getv(id) { const el=document.getElementById(id); return el?el.value.trim():null; }
+
+async function saveRecord() {
+  const { table, mode, id } = modalCtx;
+  let body = {};
+
+  if (table==='robots')    { body={robot_code:getv('f0'),description:getv('f1')}; if(!body.robot_code){toast('Robot Code required','err');return;} }
+  if (table==='locations') { body={location_code:getv('f0'),rack:getv('f1'),slot:getv('f2')}; if(!body.location_code){toast('Location Code required','err');return;} }
+  if (table==='products')  { body={product_code:getv('f0'),name:getv('f1'),category:getv('f2')}; if(!body.product_code){toast('Product Code required','err');return;} }
+  if (table==='inventory') {
+    const p=getv('f0'),l=getv('f1'),q=getv('f2');
+    if(!p||!l||q===''){toast('All fields required','err');return;}
+    body={product_id:+p,location_id:+l,quantity:+q};
+  }
+  if (table==='scanlogs')  { body={robot_code:getv('f0'),qr_code:getv('f1')}; if(!body.robot_code||!body.qr_code){toast('Both fields required','err');return;} }
+
+  try {
+    if (mode==='add') {
+      await api('/'+table, {method:'POST',body:JSON.stringify(body)});
+      toast('Created');
+    } else {
+      await api('/'+table+'/'+id, {method:'PUT',body:JSON.stringify(body)});
+      toast('Updated');
     }
+    closeModal('form-modal');
+    loadCrud();
+  } catch(e) { toast(e.message,'err'); }
+}
 
-    function openEdit(table, id, row) {
-      modalCtx = { table, mode: 'edit', id };
-      document.getElementById('modal-title').textContent = 'Edit — ' + table + ' #' + id;
-      document.getElementById('modal-body').innerHTML = FORMS[table]();
-      document.getElementById('modal-save').textContent = 'Update';
-      document.getElementById('form-modal').classList.add('open');
-      // pre-fill
-      const fill = (fid, v) => { const el = document.getElementById(fid); if (el) el.value = v ?? ''; };
-      if (table === 'robots') { fill('f0', row.robot_code); fill('f1', row.description); }
-      if (table === 'locations') { fill('f0', row.location_code); fill('f1', row.rack); fill('f2', row.slot); }
-      if (table === 'products') { fill('f0', row.product_code); fill('f1', row.name); fill('f2', row.category); }
-      if (table === 'inventory') { fill('f0', row.product_id); fill('f1', row.location_id); fill('f2', row.quantity); }
-      if (table === 'scanlogs') { fill('f0', row.robot_code); fill('f1', row.qr_code); }
-    }
+/* ── Delete ────────────────────────────────────────────────── */
+function confirmDel(table, id, label) {
+  document.getElementById('del-msg').innerHTML = `Delete <strong>${label}</strong>? This cannot be undone.`;
+  document.getElementById('del-modal').classList.add('open');
+  document.getElementById('del-ok').onclick = async () => {
+    try {
+      await api('/'+table+'/'+id, {method:'DELETE'});
+      toast('Deleted');
+      closeModal('del-modal');
+      loadCrud();
+    } catch(e) { toast(e.message,'err'); }
+  };
+}
 
-    function getv(id) { const el = document.getElementById(id); return el ? el.value.trim() : null; }
+/* ── Modal utils ───────────────────────────────────────────── */
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-backdrop').forEach(el =>
+  el.addEventListener('click', e => { if(e.target===el) closeModal(el.id); })
+);
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') { closeModal('form-modal'); closeModal('del-modal'); }
+});
 
-    async function saveRecord() {
-      const { table, mode, id } = modalCtx;
-      let body = {};
+/* ── Helpers ───────────────────────────────────────────────── */
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function jq(r) { return JSON.stringify(r).replace(/"/g,"'"); }
 
-      if (table === 'robots') { body = { robot_code: getv('f0'), description: getv('f1') }; if (!body.robot_code) { toast('Robot Code required', 'err'); return; } }
-      if (table === 'locations') { body = { location_code: getv('f0'), rack: getv('f1'), slot: getv('f2') }; if (!body.location_code) { toast('Location Code required', 'err'); return; } }
-      if (table === 'products') { body = { product_code: getv('f0'), name: getv('f1'), category: getv('f2') }; if (!body.product_code) { toast('Product Code required', 'err'); return; } }
-      if (table === 'inventory') {
-        const p = getv('f0'), l = getv('f1'), q = getv('f2');
-        if (!p || !l || q === '') { toast('All fields required', 'err'); return; }
-        body = { product_id: +p, location_id: +l, quantity: +q };
+let toastT;
+function toast(msg, type='ok') {
+  const el = document.getElementById('toast');
+  el.textContent = (type==='ok'?'✓ ':'✗ ') + msg;
+  el.className = type;
+  el.style.display = 'block';
+  clearTimeout(toastT);
+  toastT = setTimeout(()=>{ el.style.display='none'; }, 3000);
+}
+
+/* ════════════════════════════════════════════════════════════
+   CAMERA
+════════════════════════════════════════════════════════════ */
+
+// ← Replace with real Pi URL when you have it
+let MJPEG_URL = 'http://RASPBERRY_PI_IP:5000/video';
+
+// Track load timeout so we can show error if img never fires onload
+let camLoadTimer = null;
+let camActive    = false;
+
+function applyUrl() {
+  const val = document.getElementById('cam-url-input').value.trim();
+  if (!val) return;
+  MJPEG_URL = val;
+  toast('Stream URL updated — press Start Camera to connect');
+  // If stream is currently running, restart with new URL
+  if (camActive) startCamera();
+}
+
+function startCamera() {
+  camActive = true;
+  const img = document.getElementById('cam-img');
+
+  // Update URL from input field each time Start is pressed
+  const inputVal = document.getElementById('cam-url-input').value.trim();
+  if (inputVal) MJPEG_URL = inputVal;
+
+  // Show loading state
+  showCamState('loading');
+  document.getElementById('cam-loading-url').textContent = MJPEG_URL;
+  document.getElementById('btn-start-cam').disabled = true;
+  document.getElementById('btn-stop-cam').disabled  = false;
+  setCamBadge('connecting');
+
+  // Give the browser a moment to clear the old src before setting new one
+  img.src = '';
+  setTimeout(() => {
+    // Append timestamp to bust any browser cache
+    img.src = MJPEG_URL + '?t=' + Date.now();
+
+    // Timeout: if onload hasn't fired within 8 s, treat as offline
+    clearTimeout(camLoadTimer);
+    camLoadTimer = setTimeout(() => {
+      if (!img.complete || img.naturalWidth === 0) {
+        onCamError();
       }
-      if (table === 'scanlogs') { body = { robot_code: getv('f0'), qr_code: getv('f1') }; if (!body.robot_code || !body.qr_code) { toast('Both fields required', 'err'); return; } }
+    }, 8000);
+  }, 80);
+}
 
-      try {
-        if (mode === 'add') {
-          await api('/' + table, { method: 'POST', body: JSON.stringify(body) });
-          toast('Created');
-        } else {
-          await api('/' + table + '/' + id, { method: 'PUT', body: JSON.stringify(body) });
-          toast('Updated');
-        }
-        closeModal('form-modal');
-        loadCrud();
-      } catch (e) { toast(e.message, 'err'); }
-    }
+function stopCamera() {
+  camActive = false;
+  clearTimeout(camLoadTimer);
 
-    /* ── Delete ────────────────────────────────────────────────── */
-    function confirmDel(table, id, label) {
-      document.getElementById('del-msg').innerHTML = `Delete <strong>${label}</strong>? This cannot be undone.`;
-      document.getElementById('del-modal').classList.add('open');
-      document.getElementById('del-ok').onclick = async () => {
-        try {
-          await api('/' + table + '/' + id, { method: 'DELETE' });
-          toast('Deleted');
-          closeModal('del-modal');
-          loadCrud();
-        } catch (e) { toast(e.message, 'err'); }
-      };
-    }
+  const img = document.getElementById('cam-img');
+  img.src = '';                      // stops the MJPEG stream immediately
+  img.style.display = 'none';
 
-    /* ── Modal utils ───────────────────────────────────────────── */
-    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-    document.querySelectorAll('.modal-backdrop').forEach(el =>
-      el.addEventListener('click', e => { if (e.target === el) closeModal(el.id); })
-    );
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { closeModal('form-modal'); closeModal('del-modal'); }
+  showCamState('idle');
+  document.getElementById('btn-start-cam').disabled = false;
+  document.getElementById('btn-stop-cam').disabled  = true;
+  setCamBadge('offline');
+  document.getElementById('cam-footer-info').textContent = 'No stream active';
+}
+
+function onCamLoad() {
+  // img fired onload — stream is alive
+  clearTimeout(camLoadTimer);
+  showCamState('stream');
+  setCamBadge('online');
+  document.getElementById('cam-footer-info').textContent =
+    '● Streaming from ' + MJPEG_URL;
+}
+
+function onCamError() {
+  // img fired onerror, or our timeout fired
+  clearTimeout(camLoadTimer);
+  if (!camActive) return;           // user stopped manually — ignore
+
+  document.getElementById('cam-img').style.display = 'none';
+  document.getElementById('cam-error-msg').textContent =
+    'Could not reach: ' + MJPEG_URL;
+  showCamState('error');
+  setCamBadge('offline');
+  document.getElementById('btn-start-cam').disabled = false;
+  document.getElementById('btn-stop-cam').disabled  = true;
+  document.getElementById('cam-footer-info').textContent = 'Stream unavailable';
+}
+
+/**
+ * Switch which overlay/image is visible inside the camera window.
+ * state: 'idle' | 'loading' | 'error' | 'stream'
+ */
+function showCamState(state) {
+  document.getElementById('cam-idle').style.display    = state==='idle'    ? 'flex' : 'none';
+  document.getElementById('cam-loading').style.display = state==='loading' ? 'flex' : 'none';
+  document.getElementById('cam-error').style.display   = state==='error'   ? 'flex' : 'none';
+  const img = document.getElementById('cam-img');
+  if (state === 'stream') {
+    img.style.display = 'block';
+  } else {
+    img.style.display = 'none';
+  }
+}
+
+/** Update the status badge in the panel header */
+function setCamBadge(state) {
+  // state: 'online' | 'offline' | 'connecting'
+  const badge = document.getElementById('cam-status-badge');
+  const txt   = document.getElementById('cam-status-txt');
+  if (state === 'online') {
+    badge.className  = 'cam-badge online';
+    txt.textContent  = 'Camera Online';
+  } else if (state === 'connecting') {
+    badge.className  = 'cam-badge offline';
+    txt.textContent  = 'Connecting…';
+  } else {
+    badge.className  = 'cam-badge offline';
+    txt.textContent  = 'Camera Offline';
+  }
+}
+
+// Auto-start camera when the Camera tab is clicked
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  if (btn.dataset.tab === 'camera') {
+    btn.addEventListener('click', () => {
+      // Small delay so the panel is visible before we start loading
+      setTimeout(() => { if (!camActive) startCamera(); }, 100);
     });
+  }
+});
 
-    /* ── Helpers ───────────────────────────────────────────────── */
-    function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-    function jq(r) { return JSON.stringify(r).replace(/"/g, "'"); }
+/* ════════════════════════════════════════════════════════════
+   AMR CONTROL — ROS2 / Nav2 Integration
+   Requires: roslib.min.js, eventemitter2.min.js, chart.js
+════════════════════════════════════════════════════════════ */
 
-    let toastT;
-    function toast(msg, type = 'ok') {
-      const el = document.getElementById('toast');
-      el.textContent = (type === 'ok' ? '✓ ' : '✗ ') + msg;
-      el.className = type;
-      el.style.display = 'block';
-      clearTimeout(toastT);
-      toastT = setTimeout(() => { el.style.display = 'none'; }, 3000);
+// ── Dynamic script loader (load ROS libs on demand) ──────────
+function loadScript(src, cb) {
+  if (document.querySelector(`script[src="${src}"]`)) { cb && cb(); return; }
+  const s = document.createElement('script'); s.src = src;
+  s.onload = cb || (()=>{});
+  document.head.appendChild(s);
+}
+
+let rosLibsLoaded = false;
+function ensureRosLibs(cb) {
+  if (rosLibsLoaded) { cb(); return; }
+  loadScript('https://cdn.jsdelivr.net/npm/eventemitter2@6/lib/eventemitter2.min.js', () => {
+    loadScript('https://cdn.jsdelivr.net/npm/roslib@1/build/roslib.min.js', () => {
+      loadScript('https://cdn.jsdelivr.net/npm/chart.js', () => {
+        rosLibsLoaded = true;
+        cb();
+      });
+    });
+  });
+}
+
+// ── State ─────────────────────────────────────────────────────
+let ros = null;
+let rosConnected = false;
+
+// Operating mode: 'manual' | 'auto'
+let amrMode = 'manual';
+
+// Current robot pose (map frame)
+let robotX = null, robotY = null, robotYaw = null;
+
+// Goal state
+let goalX = null, goalY = null;
+let goalInitX = null;              // goal origin for distance calc
+let navState = 'IDLE';             // IDLE | NAVIGATING | SUCCESS | FAILED
+
+// Trajectory history
+let poseHistory = [];
+const MAX_HISTORY = 500;
+
+// Mission waypoints
+let missionWaypoints = [];         // [{x,y,yaw}]
+let missionActive = false;
+let missionIndex  = 0;
+
+// Map / canvas state
+let mapCanvas = null, mapCtx = null;
+let mapViewer = null;              // ROS2D viewer if lib loaded
+let mapScale  = 1;                 // pixels per metre
+let mapOriginX = 0, mapOriginY = 0; // map origin in canvas px
+let mapResolution = 0.05;          // metres per cell
+let mapWidth = 0, mapHeight = 0;   // cells
+let occupancyData = null;          // flat Uint8Array
+let mapPanOffset  = { x: 0, y: 0 };
+let isPanning     = false;
+let panStart      = { x: 0, y: 0 };
+
+// Map interaction — 'nav' | 'wp' | 'pan'
+let activeTool = 'nav';
+let isDragging = false;
+let dragStart  = null;             // {x,y} map coords at mousedown
+let dragCurrent = null;
+
+// ROS topics (populated after connect)
+let topicCmdVel, topicGoal, topicInitPose, topicPID;
+let teleopInterval = null;
+let teleopLinear = 0, teleopAngular = 0;
+
+// LiDAR data
+let lidarPoints = [];
+const MAX_LIDAR_PTS = 800;
+let lidarVisible = true;
+let pathVisible  = true;
+let histVisible  = true;
+
+// Global nav path
+let globalPath = [];
+
+// PID chart data
+let amrChartL = null, amrChartR = null;
+let pidTarL = 0, pidTarR = 0, pidActL = 0, pidActR = 0;
+const WHEEL_BASE = 0.30;
+const MAX_CHART_PTS = 50;
+
+// Preset waypoints (edit to match your map)
+const PRESETS = [
+  { name: 'Home / Charge',  x: -1.29553, y: -0.0492027, yaw: 0.1848,  color: '#27ae60' },
+  { name: 'Point A — Rack 1', x: -0.546,   y: -0.512,    yaw: -1.57,   color: '#9b59b6' },
+  { name: 'Point B — Rack 2', x:  0.997,   y: -0.417,    yaw:  0.0,    color: '#9b59b6' },
+  { name: 'Point C — Rack 3', x:  1.010,   y:  0.557,    yaw:  1.57,   color: '#9b59b6' },
+  { name: 'Point D — Rack 4', x: -0.534,   y:  0.278,    yaw:  3.14159, color: '#9b59b6' },
+];
+
+// ── ROS connection ────────────────────────────────────────────
+
+function rosConnect() {
+  ensureRosLibs(() => {
+    if (ros) { try { ros.close(); } catch(e){} }
+    const ip = document.getElementById('ros-ip').value.trim();
+    rosSetStatus('Connecting…', false);
+    ros = new ROSLIB.Ros({ url: 'ws://' + ip + ':9090' });
+
+    ros.on('connection', () => {
+      rosConnected = true;
+      rosSetStatus('Connected — ' + ip, true);
+      setupTopics();
+      initAMRMap();
+      initPIDCharts();
+      buildPresets();
+    });
+    ros.on('error', (e) => {
+      rosConnected = false;
+      rosSetStatus('Connection error', false);
+    });
+    ros.on('close', () => {
+      rosConnected = false;
+      rosSetStatus('Disconnected', false);
+    });
+  });
+}
+
+function rosDisconnect() {
+  if (ros) { try { ros.close(); } catch(e){} ros = null; }
+  rosConnected = false;
+  rosSetStatus('Disconnected', false);
+}
+
+function rosSetStatus(msg, online) {
+  document.getElementById('ros-status-txt').textContent = msg;
+  document.getElementById('ros-dot').className = 'ros-dot' + (online ? ' on' : '');
+}
+
+// ── Setup all ROS topics ──────────────────────────────────────
+
+function setupTopics() {
+  // cmd_vel
+  topicCmdVel = new ROSLIB.Topic({ ros, name: '/cmd_vel', messageType: 'geometry_msgs/Twist' });
+
+  // goal_pose
+  topicGoal = new ROSLIB.Topic({ ros, name: '/goal_pose', messageType: 'geometry_msgs/PoseStamped' });
+
+  // initialpose
+  topicInitPose = new ROSLIB.Topic({ ros, name: '/initialpose', messageType: 'geometry_msgs/PoseWithCovarianceStamped' });
+
+  // PID
+  topicPID = new ROSLIB.Topic({ ros, name: '/pid_command', messageType: 'std_msgs/msg/String' });
+
+  // ── amcl_pose → robot position + history
+  const poseTopic = new ROSLIB.Topic({ ros, name: '/amcl_pose', messageType: 'geometry_msgs/PoseWithCovarianceStamped' });
+  poseTopic.subscribe(msg => {
+    robotX = msg.pose.pose.position.x;
+    robotY = msg.pose.pose.position.y;
+    const qz = msg.pose.pose.orientation.z;
+    const qw = msg.pose.pose.orientation.w;
+    robotYaw = 2 * Math.atan2(qz, qw);
+
+    // Trajectory history
+    if (histVisible) {
+      poseHistory.push({ x: robotX, y: robotY });
+      if (poseHistory.length > MAX_HISTORY) poseHistory.shift();
     }
 
-    /* ════════════════════════════════════════════════════════════
-       CAMERA
-    ════════════════════════════════════════════════════════════ */
+    updateIMUDisplay();
+    updateNavStatus();
+    redrawMap();
+  });
 
-    // ← Replace with real Pi URL when you have it
-    let MJPEG_URL = 'http://RASPBERRY_PI_IP:5000/video';
+  // ── IMU
+  const imuTopic = new ROSLIB.Topic({ ros, name: '/imu/data', messageType: 'sensor_msgs/msg/Imu' });
+  imuTopic.subscribe(msg => {
+    const yaw = 2 * Math.atan2(msg.orientation.z, msg.orientation.w);
+    document.getElementById('imu-yaw-deg').textContent = (yaw * 180 / Math.PI).toFixed(2) + '°';
+    document.getElementById('imu-yaw-rad').textContent = yaw.toFixed(3);
+  });
 
-    // Track load timeout so we can show error if img never fires onload
-    let camLoadTimer = null;
-    let camActive = false;
+  // ── /map — occupancy grid
+  const mapTopic = new ROSLIB.Topic({ ros, name: '/map', messageType: 'nav_msgs/msg/OccupancyGrid' });
+  mapTopic.subscribe(msg => {
+    mapResolution = msg.info.resolution;
+    mapWidth      = msg.info.width;
+    mapHeight     = msg.info.height;
+    mapOriginX    = msg.info.origin.position.x;
+    mapOriginY    = msg.info.origin.position.y;
+    occupancyData = new Int8Array(msg.data);
 
-    function applyUrl() {
-      const val = document.getElementById('cam-url-input').value.trim();
-      if (!val) return;
-      MJPEG_URL = val;
-      toast('Stream URL updated — press Start Camera to connect');
-      // If stream is currently running, restart with new URL
-      if (camActive) startCamera();
-    }
+    fitMapToCanvas();
+    redrawMap();
+    document.getElementById('map-overlay-msg').style.display = 'none';
+  });
 
-    function startCamera() {
-      camActive = true;
-      const img = document.getElementById('cam-img');
+  // ── /scan — LiDAR
+  const scanTopic = new ROSLIB.Topic({ ros, name: '/scan', messageType: 'sensor_msgs/msg/LaserScan' });
+  let lastScanTime = 0;
+  scanTopic.subscribe(msg => {
+    if (Date.now() - lastScanTime < 100) return;   // 10 Hz cap
+    lastScanTime = Date.now();
+    if (robotX === null) return;
 
-      // Update URL from input field each time Start is pressed
-      const inputVal = document.getElementById('cam-url-input').value.trim();
-      if (inputVal) MJPEG_URL = inputVal;
-
-      // Show loading state
-      showCamState('loading');
-      document.getElementById('cam-loading-url').textContent = MJPEG_URL;
-      document.getElementById('btn-start-cam').disabled = true;
-      document.getElementById('btn-stop-cam').disabled = false;
-      setCamBadge('connecting');
-
-      // Give the browser a moment to clear the old src before setting new one
-      img.src = '';
-      setTimeout(() => {
-        // Append timestamp to bust any browser cache
-        img.src = MJPEG_URL + '?t=' + Date.now();
-
-        // Timeout: if onload hasn't fired within 8 s, treat as offline
-        clearTimeout(camLoadTimer);
-        camLoadTimer = setTimeout(() => {
-          if (!img.complete || img.naturalWidth === 0) {
-            onCamError();
-          }
-        }, 8000);
-      }, 80);
-    }
-
-    function stopCamera() {
-      camActive = false;
-      clearTimeout(camLoadTimer);
-
-      const img = document.getElementById('cam-img');
-      img.src = '';                      // stops the MJPEG stream immediately
-      img.style.display = 'none';
-
-      showCamState('idle');
-      document.getElementById('btn-start-cam').disabled = false;
-      document.getElementById('btn-stop-cam').disabled = true;
-      setCamBadge('offline');
-      document.getElementById('cam-footer-info').textContent = 'No stream active';
-    }
-
-    function onCamLoad() {
-      // img fired onload — stream is alive
-      clearTimeout(camLoadTimer);
-      showCamState('stream');
-      setCamBadge('online');
-      document.getElementById('cam-footer-info').textContent =
-        '● Streaming from ' + MJPEG_URL;
-    }
-
-    function onCamError() {
-      // img fired onerror, or our timeout fired
-      clearTimeout(camLoadTimer);
-      if (!camActive) return;           // user stopped manually — ignore
-
-      document.getElementById('cam-img').style.display = 'none';
-      document.getElementById('cam-error-msg').textContent =
-        'Could not reach: ' + MJPEG_URL;
-      showCamState('error');
-      setCamBadge('offline');
-      document.getElementById('btn-start-cam').disabled = false;
-      document.getElementById('btn-stop-cam').disabled = true;
-      document.getElementById('cam-footer-info').textContent = 'Stream unavailable';
-    }
-
-    /**
-     * Switch which overlay/image is visible inside the camera window.
-     * state: 'idle' | 'loading' | 'error' | 'stream'
-     */
-    function showCamState(state) {
-      document.getElementById('cam-idle').style.display = state === 'idle' ? 'flex' : 'none';
-      document.getElementById('cam-loading').style.display = state === 'loading' ? 'flex' : 'none';
-      document.getElementById('cam-error').style.display = state === 'error' ? 'flex' : 'none';
-      const img = document.getElementById('cam-img');
-      if (state === 'stream') {
-        img.style.display = 'block';
-      } else {
-        img.style.display = 'none';
-      }
-    }
-
-    /** Update the status badge in the panel header */
-    function setCamBadge(state) {
-      // state: 'online' | 'offline' | 'connecting'
-      const badge = document.getElementById('cam-status-badge');
-      const txt = document.getElementById('cam-status-txt');
-      if (state === 'online') {
-        badge.className = 'cam-badge online';
-        txt.textContent = 'Camera Online';
-      } else if (state === 'connecting') {
-        badge.className = 'cam-badge offline';
-        txt.textContent = 'Connecting…';
-      } else {
-        badge.className = 'cam-badge offline';
-        txt.textContent = 'Camera Offline';
-      }
-    }
-
-    // Auto-start camera when the Camera tab is clicked
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      if (btn.dataset.tab === 'camera') {
-        btn.addEventListener('click', () => {
-          // Small delay so the panel is visible before we start loading
-          setTimeout(() => { if (!camActive) startCamera(); }, 100);
+    lidarPoints = [];
+    const step = Math.max(1, Math.floor(msg.ranges.length / MAX_LIDAR_PTS));
+    for (let i = 0; i < msg.ranges.length; i += step) {
+      const r = msg.ranges[i];
+      if (r >= msg.range_min && r <= msg.range_max) {
+        const angle = robotYaw + msg.angle_min + i * msg.angle_increment;
+        lidarPoints.push({
+          x: robotX + r * Math.cos(angle),
+          y: robotY + r * Math.sin(angle),
         });
       }
+    }
+    if (lidarVisible) redrawMap();
+  });
+
+  // ── /plan — global path
+  const planTopic = new ROSLIB.Topic({ ros, name: '/plan', messageType: 'nav_msgs/msg/Path' });
+  planTopic.subscribe(msg => {
+    globalPath = msg.poses.map(p => ({ x: p.pose.position.x, y: p.pose.position.y }));
+    if (pathVisible) redrawMap();
+  });
+
+  // ── navigation status
+  const navStatus = new ROSLIB.Topic({ ros, name: '/navigate_to_pose/_action/status', messageType: 'action_msgs/msg/GoalStatusArray' });
+  navStatus.subscribe(msg => {
+    if (!msg.status_list || !msg.status_list.length) return;
+    const s = msg.status_list[msg.status_list.length - 1].status;
+    if (s === 4) {   // SUCCEEDED
+      if (missionActive) advanceMission();
+      else setNavState('SUCCESS');
+      globalPath = [];
+    } else if (s === 6) {  // ABORTED
+      missionActive = false;
+      setNavState('FAILED');
+      globalPath = [];
+    }
+  });
+
+  // ── /odom for PID chart actual wheel speeds
+  const odomTopic = new ROSLIB.Topic({ ros, name: '/odom', messageType: 'nav_msgs/msg/Odometry' });
+  odomTopic.subscribe(msg => {
+    const v = msg.twist.twist.linear.x;
+    const w = msg.twist.twist.angular.z;
+    pidActL = v - (w * WHEEL_BASE / 2);
+    pidActR = v + (w * WHEEL_BASE / 2);
+  });
+}
+
+// ── Map initialisation ────────────────────────────────────────
+
+function initAMRMap() {
+  const wrap = document.getElementById('amr-map-wrap');
+  wrap.innerHTML = '';   // clear placeholder text
+
+  mapCanvas = document.createElement('canvas');
+  mapCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
+  wrap.appendChild(mapCanvas);
+  mapCtx = mapCanvas.getContext('2d');
+
+  resizeMapCanvas();
+  window.addEventListener('resize', resizeMapCanvas);
+
+  // Mouse interactions
+  wrap.addEventListener('mousedown',   onMapMouseDown);
+  wrap.addEventListener('mousemove',   onMapMouseMove);
+  wrap.addEventListener('mouseup',     onMapMouseUp);
+  wrap.addEventListener('mouseleave',  onMapMouseUp);
+  wrap.addEventListener('wheel',       onMapWheel, { passive: false });
+  // Touch support
+  wrap.addEventListener('touchstart',  onMapTouchStart, { passive: false });
+  wrap.addEventListener('touchmove',   onMapTouchMove,  { passive: false });
+  wrap.addEventListener('touchend',    onMapTouchEnd);
+
+  buildPresets();
+}
+
+function resizeMapCanvas() {
+  if (!mapCanvas) return;
+  const wrap = document.getElementById('amr-map-wrap');
+  mapCanvas.width  = wrap.clientWidth;
+  mapCanvas.height = wrap.clientHeight;
+  redrawMap();
+}
+
+function fitMapToCanvas() {
+  if (!mapCanvas || !mapWidth || !mapHeight) return;
+  const cw = mapCanvas.width, ch = mapCanvas.height;
+  const scaleX = cw / (mapWidth  * mapResolution);
+  const scaleY = ch / (mapHeight * mapResolution);
+  mapScale = Math.min(scaleX, scaleY) * 0.9;
+  // Centre the map
+  mapPanOffset.x = (cw  - mapWidth  * mapResolution * mapScale) / 2;
+  mapPanOffset.y = (ch  - mapHeight * mapResolution * mapScale) / 2;
+}
+
+// ── Coordinate conversion ─────────────────────────────────────
+
+function worldToCanvas(wx, wy) {
+  // ROS map: origin bottom-left, Y up.  Canvas: origin top-left, Y down.
+  const cx = (wx - mapOriginX) * mapScale + mapPanOffset.x;
+  const cy = mapCanvas.height - ((wy - mapOriginY) * mapScale) - mapPanOffset.y;
+  return { x: cx, y: cy };
+}
+
+function canvasToWorld(cx, cy) {
+  const wx = (cx - mapPanOffset.x) / mapScale + mapOriginX;
+  const wy = (mapCanvas.height - cy - mapPanOffset.y) / mapScale + mapOriginY;
+  return { x: wx, y: wy };
+}
+
+// ── Map drawing ───────────────────────────────────────────────
+
+let rafPending = false;
+function redrawMap() {
+  if (!mapCtx || rafPending) return;
+  rafPending = true;
+  requestAnimationFrame(_doRedraw);
+}
+
+function _doRedraw() {
+  rafPending = false;
+  const W = mapCanvas.width, H = mapCanvas.height;
+  mapCtx.clearRect(0, 0, W, H);
+  mapCtx.fillStyle = '#1a2535';
+  mapCtx.fillRect(0, 0, W, H);
+
+  if (occupancyData) drawOccupancyGrid();
+  if (histVisible   && poseHistory.length > 1) drawPoseHistory();
+  if (pathVisible   && globalPath.length  > 1) drawGlobalPath();
+  if (lidarVisible  && lidarPoints.length  > 0) drawLiDAR();
+  drawWaypointMarkers();
+  drawGoalArrow();
+  if (robotX !== null) drawRobot();
+  if (isDragging && dragStart && dragCurrent) drawDragArrow();
+}
+
+function drawOccupancyGrid() {
+  const ctx = mapCtx;
+  const cellPx = mapResolution * mapScale;
+
+  // Use ImageData for performance
+  const iw = Math.ceil(mapWidth  * cellPx);
+  const ih = Math.ceil(mapHeight * cellPx);
+  if (iw <= 0 || ih <= 0) return;
+
+  const offCanvas = document.createElement('canvas');
+  offCanvas.width = iw; offCanvas.height = ih;
+  const octx = offCanvas.getContext('2d');
+  const img = octx.createImageData(iw, ih);
+
+  for (let gy = 0; gy < mapHeight; gy++) {
+    for (let gx = 0; gx < mapWidth; gx++) {
+      const val = occupancyData[gy * mapWidth + gx];
+      let r, g, b, a;
+      if (val === -1) { r=80; g=90; b=100; a=200; }       // unknown — grey
+      else if (val === 0) { r=230; g=235; b=240; a=255; }  // free — light
+      else { r=20; g=25; b=30; a=255; }                    // occupied — dark
+
+      const px = Math.floor(gx * cellPx);
+      const py = Math.floor((mapHeight - 1 - gy) * cellPx); // flip Y
+      const pw = Math.max(1, Math.ceil(cellPx));
+      const ph = Math.max(1, Math.ceil(cellPx));
+
+      for (let dy = 0; dy < ph && py+dy < ih; dy++) {
+        for (let dx = 0; dx < pw && px+dx < iw; dx++) {
+          const i = ((py+dy) * iw + (px+dx)) * 4;
+          img.data[i]=r; img.data[i+1]=g; img.data[i+2]=b; img.data[i+3]=a;
+        }
+      }
+    }
+  }
+  octx.putImageData(img, 0, 0);
+  ctx.drawImage(offCanvas, mapPanOffset.x, mapPanOffset.y);
+}
+
+function drawPoseHistory() {
+  const ctx = mapCtx;
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(52,152,219,0.5)';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  const p0 = worldToCanvas(poseHistory[0].x, poseHistory[0].y);
+  ctx.moveTo(p0.x, p0.y);
+  for (let i = 1; i < poseHistory.length; i++) {
+    const p = worldToCanvas(poseHistory[i].x, poseHistory[i].y);
+    ctx.lineTo(p.x, p.y);
+  }
+  ctx.stroke();
+}
+
+function drawGlobalPath() {
+  const ctx = mapCtx;
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(46,204,113,0.75)';
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  const p0 = worldToCanvas(globalPath[0].x, globalPath[0].y);
+  ctx.moveTo(p0.x, p0.y);
+  for (let i = 1; i < globalPath.length; i++) {
+    const p = worldToCanvas(globalPath[i].x, globalPath[i].y);
+    ctx.lineTo(p.x, p.y);
+  }
+  ctx.stroke();
+}
+
+function drawLiDAR() {
+  const ctx = mapCtx;
+  ctx.fillStyle = 'rgba(231,76,60,0.65)';
+  const dotR = Math.max(1.5, mapScale * mapResolution * 0.7);
+  for (const pt of lidarPoints) {
+    const c = worldToCanvas(pt.x, pt.y);
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, dotR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawRobot() {
+  const ctx = mapCtx;
+  const c = worldToCanvas(robotX, robotY);
+  const r = Math.max(8, mapScale * 0.18);
+
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.rotate(-robotYaw);  // canvas Y is inverted
+
+  // Body
+  ctx.fillStyle = '#34495e';
+  ctx.strokeStyle = '#f5a623';
+  ctx.lineWidth = 1.5;
+  const bw = r * 1.8, bh = r * 2.0;
+  ctx.beginPath();
+  ctx.roundRect(-bw/2, -bh/2, bw, bh, r*0.15);
+  ctx.fill(); ctx.stroke();
+
+  // Direction arrow
+  ctx.fillStyle = '#f1c40f';
+  ctx.beginPath();
+  ctx.moveTo(bw/2 + r*0.2, 0);
+  ctx.lineTo(bw/2 - r*0.25, -r*0.35);
+  ctx.lineTo(bw/2 - r*0.25,  r*0.35);
+  ctx.closePath();
+  ctx.fill();
+
+  // LiDAR dome
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.arc(-r*0.15, 0, r*0.3, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#f1c40f';
+  ctx.beginPath(); ctx.arc(-r*0.15, 0, r*0.12, 0, Math.PI*2); ctx.fill();
+
+  ctx.restore();
+}
+
+function drawWaypointMarkers() {
+  const ctx = mapCtx;
+  // Presets
+  PRESETS.forEach((p, i) => {
+    const c = worldToCanvas(p.x, p.y);
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 7, 0, Math.PI*2);
+    ctx.fillStyle = p.color + 'cc';
+    ctx.fill();
+    ctx.strokeStyle = p.color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  });
+
+  // Mission waypoints
+  missionWaypoints.forEach((wp, i) => {
+    const c = worldToCanvas(wp.x, wp.y);
+    const done = missionActive && i < missionIndex;
+    const active = missionActive && i === missionIndex;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 8, 0, Math.PI*2);
+    ctx.fillStyle = done ? 'rgba(74,98,120,0.6)' : active ? 'rgba(46,204,113,0.85)' : 'rgba(245,166,35,0.85)';
+    ctx.fill();
+    ctx.strokeStyle = active ? '#2ecc71' : '#f5a623';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // Number label
+    ctx.fillStyle = '#000';
+    ctx.font = `bold ${Math.max(8, mapScale*0.12)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(i + 1, c.x, c.y);
+
+    // Orientation arrow if yaw defined
+    if (wp.yaw !== undefined) {
+      const len = 14;
+      const ex = c.x + len * Math.cos(-wp.yaw);
+      const ey = c.y + len * Math.sin(-wp.yaw);
+      ctx.beginPath();
+      ctx.moveTo(c.x, c.y);
+      ctx.lineTo(ex, ey);
+      ctx.strokeStyle = active ? '#2ecc71' : '#f5a623';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  });
+}
+
+function drawGoalArrow() {
+  if (goalX === null || navState !== 'NAVIGATING') return;
+  const ctx = mapCtx;
+  const c = worldToCanvas(goalX, goalY);
+  ctx.beginPath();
+  ctx.arc(c.x, c.y, 9, 0, Math.PI*2);
+  ctx.strokeStyle = '#9b59b6';
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([4, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawDragArrow() {
+  if (!dragStart || !dragCurrent) return;
+  const ctx = mapCtx;
+  const s = worldToCanvas(dragStart.x, dragStart.y);
+  const e = worldToCanvas(dragCurrent.x, dragCurrent.y);
+  const angle = Math.atan2(e.y - s.y, e.x - s.x);
+  const len = Math.sqrt((e.x-s.x)**2 + (e.y-s.y)**2);
+
+  ctx.save();
+  ctx.translate(s.x, s.y);
+  ctx.rotate(angle);
+
+  // Shaft
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(len - 8, 0);
+  ctx.strokeStyle = '#9b59b6';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Arrowhead
+  ctx.beginPath();
+  ctx.moveTo(len, 0);
+  ctx.lineTo(len - 10, -5);
+  ctx.lineTo(len - 10,  5);
+  ctx.closePath();
+  ctx.fillStyle = '#9b59b6';
+  ctx.fill();
+
+  // Origin dot
+  ctx.restore();
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, 5, 0, Math.PI*2);
+  ctx.fillStyle = '#9b59b6';
+  ctx.fill();
+}
+
+// ── Map mouse / touch handlers ─────────────────────────────────
+
+function getCanvasPos(e) {
+  const rect = mapCanvas.getBoundingClientRect();
+  const touch = e.touches ? e.touches[0] : e;
+  return {
+    x: (touch.clientX - rect.left) * (mapCanvas.width  / rect.width),
+    y: (touch.clientY - rect.top)  * (mapCanvas.height / rect.height),
+  };
+}
+
+function onMapMouseDown(e) {
+  e.preventDefault();
+  const cp = getCanvasPos(e);
+  const wp = canvasToWorld(cp.x, cp.y);
+
+  if (activeTool === 'pan' || e.button === 1) {
+    isPanning = true;
+    panStart = { x: e.clientX - mapPanOffset.x, y: e.clientY - mapPanOffset.y };
+    return;
+  }
+  if (activeTool === 'nav') {
+    isDragging = true;
+    dragStart   = { x: wp.x, y: wp.y };
+    dragCurrent = { x: wp.x, y: wp.y };
+    return;
+  }
+  if (activeTool === 'wp') {
+    // Single click adds waypoint
+    addMissionWaypoint(wp.x, wp.y, 0);
+    redrawMap();
+  }
+}
+
+function onMapMouseMove(e) {
+  if (!mapCanvas) return;
+  const cp = getCanvasPos(e);
+  const wp = canvasToWorld(cp.x, cp.y);
+  document.getElementById('map-coord-cur').textContent =
+    `Map X: ${wp.x.toFixed(3)} · Y: ${wp.y.toFixed(3)}`;
+
+  if (isPanning) {
+    mapPanOffset.x = e.clientX - panStart.x;
+    mapPanOffset.y = e.clientY - panStart.y;
+    redrawMap();
+    return;
+  }
+  if (isDragging && activeTool === 'nav') {
+    dragCurrent = { x: wp.x, y: wp.y };
+    redrawMap();
+  }
+}
+
+function onMapMouseUp(e) {
+  if (isPanning) { isPanning = false; return; }
+  if (isDragging && activeTool === 'nav') {
+    isDragging = false;
+    if (dragStart) {
+      const dx = dragCurrent.x - dragStart.x;
+      const dy = dragCurrent.y - dragStart.y;
+      const yaw = Math.atan2(dy, dx);   // ROS uses CCW
+      sendNavGoal(dragStart.x, dragStart.y, yaw);
+      dragStart = null; dragCurrent = null;
+    }
+    redrawMap();
+  }
+}
+
+function onMapWheel(e) {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.12 : 0.88;
+  mapZoom(factor, getCanvasPos(e));
+}
+
+function onMapTouchStart(e) { e.preventDefault(); onMapMouseDown(e); }
+function onMapTouchMove(e)  { e.preventDefault(); onMapMouseMove(e); }
+function onMapTouchEnd(e)   { onMapMouseUp(e); }
+
+// ── Map utilities ─────────────────────────────────────────────
+
+function mapZoom(factor, about) {
+  const cx = about ? about.x : mapCanvas.width  / 2;
+  const cy = about ? about.y : mapCanvas.height / 2;
+  mapPanOffset.x = cx - (cx - mapPanOffset.x) * factor;
+  mapPanOffset.y = cy - (cy - mapPanOffset.y) * factor;
+  mapScale *= factor;
+  redrawMap();
+}
+
+function mapResetView() { fitMapToCanvas(); redrawMap(); }
+
+function setTool(tool) {
+  activeTool = tool;
+  ['nav','wp','pan'].forEach(t => {
+    document.getElementById('tool-' + t).classList.toggle('active', t === tool);
+  });
+  const hints = {
+    nav:  'Click & drag on map to set goal + orientation',
+    wp:   'Click map to add mission waypoints',
+    pan:  'Click & drag to pan the map view',
+  };
+  document.getElementById('map-hint').textContent = hints[tool];
+  if (mapCanvas) mapCanvas.style.cursor = tool === 'pan' ? 'grab' : 'crosshair';
+}
+
+function toggleLayer(layer, on) {
+  if (layer === 'lidar') lidarVisible = on;
+  if (layer === 'path')  pathVisible  = on;
+  if (layer === 'hist')  histVisible  = on;
+  redrawMap();
+}
+
+// ── Navigation ────────────────────────────────────────────────
+
+function sendNavGoal(x, y, yaw) {
+  if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
+  if (amrMode !== 'auto') { toast('Switch to Auto Mode to navigate', 'err'); return; }
+
+  const qz = Math.sin(yaw / 2), qw = Math.cos(yaw / 2);
+  topicGoal.publish(new ROSLIB.Message({
+    header: { frame_id: 'map' },
+    pose: {
+      position: { x, y, z: 0 },
+      orientation: { x: 0, y: 0, z: qz, w: qw }
+    }
+  }));
+
+  goalX = x; goalY = y;
+  goalInitX = robotX; // for progress calc
+  setNavState('NAVIGATING');
+  document.getElementById('ns-gx').textContent = x.toFixed(3);
+  document.getElementById('ns-gy').textContent = y.toFixed(3);
+}
+
+function setNavState(state) {
+  navState = state;
+  const el = document.getElementById('nav-state-badge');
+  el.textContent = state;
+  el.className = 'ns-val ' + state.toLowerCase();
+  updateNavStatus();
+}
+
+function updateNavStatus() {
+  if (robotX !== null && robotY !== null) {
+    document.getElementById('map-coord-robot').textContent =
+      `Robot: ${robotX.toFixed(3)} · ${robotY.toFixed(3)}  ·  Yaw: ${(robotYaw*180/Math.PI).toFixed(1)}°`;
+  }
+  if (goalX !== null && robotX !== null) {
+    const dist = Math.sqrt((goalX-robotX)**2 + (goalY-robotY)**2);
+    document.getElementById('ns-dist').textContent = dist.toFixed(2) + ' m';
+    // Simple progress: % of initial distance covered
+    if (goalInitX !== null) {
+      const initDist = Math.sqrt((goalX-goalInitX)**2 + (goalY-(goalY))**2) || dist;
+      const prog = Math.max(0, Math.min(100, (1 - dist / Math.max(dist, 0.01)) * 100));
+      document.getElementById('ns-prog').textContent = prog.toFixed(0) + '%';
+    }
+  }
+}
+
+function setInitialPose() {
+  if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
+  const pose = PRESETS[0];
+  const qz = Math.sin(pose.yaw/2), qw = Math.cos(pose.yaw/2);
+  topicInitPose.publish(new ROSLIB.Message({
+    header: { frame_id: 'map' },
+    pose: {
+      pose: {
+        position: { x: pose.x, y: pose.y, z: 0 },
+        orientation: { x: 0, y: 0, z: qz, w: qw }
+      },
+      covariance: [0.05,0,0,0,0,0, 0,0.05,0,0,0,0, 0,0,0,0,0,0, 0,0,0,0,0,0, 0,0,0,0,0,0, 0,0,0,0,0,0.05]
+    }
+  }));
+  toast('Initial pose set at HOME', 'ok');
+}
+
+// ── Emergency stop ────────────────────────────────────────────
+
+function emergencyStop() {
+  if (teleopInterval) { clearInterval(teleopInterval); teleopInterval = null; }
+  missionActive = false;
+  missionIndex  = 0;
+  setNavState('IDLE');
+  goalX = null; goalY = null;
+  globalPath = [];
+
+  if (rosConnected) {
+    const zero = new ROSLIB.Message({ linear:{x:0,y:0,z:0}, angular:{x:0,y:0,z:0} });
+    for (let i = 0; i < 5; i++) setTimeout(() => topicCmdVel.publish(zero), i * 50);
+  }
+  toast('⛔ EMERGENCY STOP — Robot halted', 'err');
+  redrawMap();
+}
+
+// ── Teleop ────────────────────────────────────────────────────
+
+function teleopStart(linDir, angDir) {
+  if (amrMode !== 'manual') { toast('Switch to Manual Mode', 'err'); return; }
+  if (!rosConnected) return;
+  const lin = parseFloat(document.getElementById('sl-linear').value);
+  const ang = parseFloat(document.getElementById('sl-angular').value);
+  teleopLinear  = lin * linDir;
+  teleopAngular = ang * angDir;
+  if (teleopInterval) clearInterval(teleopInterval);
+  teleopInterval = setInterval(() => {
+    topicCmdVel.publish(new ROSLIB.Message({
+      linear:  { x: teleopLinear,  y: 0, z: 0 },
+      angular: { x: 0, y: 0,       z: teleopAngular }
+    }));
+  }, 100);
+}
+
+function teleopStop() {
+  clearInterval(teleopInterval); teleopInterval = null;
+  if (rosConnected) {
+    topicCmdVel.publish(new ROSLIB.Message({ linear:{x:0,y:0,z:0}, angular:{x:0,y:0,z:0} }));
+  }
+}
+
+function updateSpeedLabel() {
+  document.getElementById('lbl-linear').textContent  = parseFloat(document.getElementById('sl-linear').value).toFixed(2);
+  document.getElementById('lbl-angular').textContent = parseFloat(document.getElementById('sl-angular').value).toFixed(2);
+}
+
+// ── Mode switching ────────────────────────────────────────────
+
+function setMode(mode) {
+  amrMode = mode;
+  document.getElementById('mode-manual-btn').className = 'mode-btn' + (mode==='manual' ? ' active-manual' : '');
+  document.getElementById('mode-auto-btn').className   = 'mode-btn' + (mode==='auto'   ? ' active-auto'   : '');
+  document.getElementById('teleop-mode-lbl').textContent = mode === 'manual' ? 'ACTIVE' : 'DISABLED';
+  document.getElementById('teleop-mode-lbl').style.color = mode === 'manual' ? 'var(--green)' : 'var(--red)';
+
+  // Disable teleop buttons when in auto mode
+  const tBtns = document.querySelectorAll('.t-btn');
+  tBtns.forEach(b => { b.disabled = (mode === 'auto'); });
+
+  if (mode === 'manual') teleopStop();
+  toast(mode === 'manual' ? '🎮 Manual Mode active' : '🤖 Auto Navigation active', 'ok');
+}
+
+// ── Mission planner ───────────────────────────────────────────
+
+function addMissionWaypoint(x, y, yaw = 0) {
+  missionWaypoints.push({ x, y, yaw });
+  renderWaypointList();
+}
+
+function clearWaypoints() {
+  missionWaypoints = [];
+  missionActive = false;
+  missionIndex  = 0;
+  renderWaypointList();
+  redrawMap();
+  setNavState('IDLE');
+}
+
+function renderWaypointList() {
+  const list = document.getElementById('wp-list');
+  document.getElementById('wp-count-lbl').textContent = missionWaypoints.length + ' point' + (missionWaypoints.length !== 1 ? 's' : '');
+  if (!missionWaypoints.length) {
+    list.innerHTML = `<div style="text-align:center;padding:16px;color:var(--muted);font-family:var(--mono);font-size:10px">Switch to 📌 Add Waypoint mode then click the map</div>`;
+    return;
+  }
+  list.innerHTML = missionWaypoints.map((wp, i) => {
+    const done   = missionActive && i < missionIndex;
+    const active = missionActive && i === missionIndex;
+    return `<div class="wp-item${active?' active-wp':''}${done?' done-wp':''}">
+      <div class="wp-num">${i+1}</div>
+      <div class="wp-coords">X ${wp.x.toFixed(2)} · Y ${wp.y.toFixed(2)}</div>
+      <button class="wp-del" onclick="removeMissionWaypoint(${i})" title="Remove">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function removeMissionWaypoint(i) {
+  missionWaypoints.splice(i, 1);
+  renderWaypointList();
+  redrawMap();
+}
+
+function startMission() {
+  if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
+  if (!missionWaypoints.length) { toast('No waypoints defined', 'err'); return; }
+  if (amrMode !== 'auto') { setMode('auto'); }
+  missionActive = true;
+  missionIndex  = 0;
+  document.getElementById('mission-start-btn').disabled = true;
+  document.getElementById('mission-stop-btn').disabled  = false;
+  renderWaypointList();
+  navigateToCurrentMissionPoint();
+}
+
+function stopMission() {
+  missionActive = false;
+  emergencyStop();
+  document.getElementById('mission-start-btn').disabled = false;
+  document.getElementById('mission-stop-btn').disabled  = true;
+  renderWaypointList();
+}
+
+function navigateToCurrentMissionPoint() {
+  if (!missionActive || missionIndex >= missionWaypoints.length) return;
+  const wp = missionWaypoints[missionIndex];
+  sendNavGoal(wp.x, wp.y, wp.yaw || 0);
+  renderWaypointList();
+}
+
+function advanceMission() {
+  missionIndex++;
+  if (missionIndex < missionWaypoints.length) {
+    setTimeout(() => {
+      if (missionActive) navigateToCurrentMissionPoint();
+    }, 1200);
+  } else {
+    missionActive = false;
+    setNavState('SUCCESS');
+    document.getElementById('mission-start-btn').disabled = false;
+    document.getElementById('mission-stop-btn').disabled  = true;
+    renderWaypointList();
+    toast('✅ Mission complete — all waypoints reached', 'ok');
+  }
+}
+
+// ── Preset nav buttons ────────────────────────────────────────
+
+function buildPresets() {
+  const list = document.getElementById('preset-list');
+  list.innerHTML = PRESETS.map((p, i) => `
+    <div class="wp-preset" onclick="sendNavGoal(${p.x},${p.y},${p.yaw})">
+      <div class="wp-preset-dot" style="background:${p.color}"></div>
+      <span>${p.name}</span>
+      <span style="margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--muted)">${p.x.toFixed(2)},${p.y.toFixed(2)}</span>
+    </div>`).join('');
+}
+
+// ── IMU display ───────────────────────────────────────────────
+
+function updateIMUDisplay() {
+  if (robotX !== null) {
+    document.getElementById('imu-px').textContent = robotX.toFixed(3);
+    document.getElementById('imu-py').textContent = robotY.toFixed(3);
+  }
+}
+
+// ── PID ───────────────────────────────────────────────────────
+
+function sendPID() {
+  if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
+  const kp = document.getElementById('pid-kp').value;
+  const ki = document.getElementById('pid-ki').value;
+  topicPID.publish(new ROSLIB.Message({ data: `PID,${parseFloat(kp).toFixed(2)},${parseFloat(ki).toFixed(2)}\n` }));
+  toast(`PID uploaded — Kp=${kp} Ki=${ki}`, 'ok');
+}
+
+function pidTestRun() {
+  if (amrMode !== 'manual') { toast('Switch to Manual Mode', 'err'); return; }
+  const spd = parseFloat(document.getElementById('test-speed-amr').value);
+  teleopStart(1, 0);
+  teleopLinear = spd;
+}
+
+function pidTestStop() { teleopStop(); }
+
+function initPIDCharts() {
+  const opts = {
+    animation: false, responsive: true, maintainAspectRatio: false,
+    scales: {
+      y: { min: -0.5, max: 0.5, grid: { color: '#1a2636' }, ticks: { color: '#4a6278', stepSize: 0.25 } },
+      x: { display: false }
+    },
+    plugins: { legend: { display: false } },
+    layout: { padding: { top: 18 } }
+  };
+  const mkData = () => ({
+    labels: Array(MAX_CHART_PTS).fill(''),
+    datasets: [
+      { borderColor: '#e74c3c', data: Array(MAX_CHART_PTS).fill(0), borderWidth: 1.5, pointRadius: 0, tension: 0.2 },
+      { borderColor: '#3b9eff', data: Array(MAX_CHART_PTS).fill(0), borderWidth: 1.5, pointRadius: 0, tension: 0.2 },
+    ]
+  });
+
+  const cL = document.getElementById('chartAMR-L');
+  const cR = document.getElementById('chartAMR-R');
+  if (!cL || !cR) return;
+  if (amrChartL) { amrChartL.destroy(); amrChartR.destroy(); }
+  amrChartL = new Chart(cL.getContext('2d'), { type:'line', data: mkData(), options: opts });
+  amrChartR = new Chart(cR.getContext('2d'), { type:'line', data: mkData(), options: opts });
+
+  setInterval(() => {
+    if (!amrChartL) return;
+    if (rosConnected && topicCmdVel) {
+      // target from last published cmd_vel
+      topicCmdVel.subscribe && null; // already subscribed
+    }
+    const push = (chart, tar, act) => {
+      chart.data.datasets[0].data.shift(); chart.data.datasets[0].data.push(tar);
+      chart.data.datasets[1].data.shift(); chart.data.datasets[1].data.push(act);
+      chart.update('none');
+    };
+    push(amrChartL, pidTarL, pidActL);
+    push(amrChartR, pidTarR, pidActR);
+  }, 100);
+
+  // subscribe to cmd_vel to get targets
+  if (topicCmdVel) {
+    topicCmdVel.subscribe(msg => {
+      const v = msg.linear.x, w = msg.angular.z;
+      pidTarL = v - (w * WHEEL_BASE / 2);
+      pidTarR = v + (w * WHEEL_BASE / 2);
     });
+  }
+}
 
-    /* ════════════════════════════════════════════════════════════
-       BOOT
-    ════════════════════════════════════════════════════════════ */
-    connectWS();   // start WebSocket — handles live view
-    loadCrud();    // load all CRUD tables once
-  </script>
+/* ════════════════════════════════════════════════════════════
+   BOOT
+════════════════════════════════════════════════════════════ */
+connectWS();   // start WebSocket — handles live view
+loadCrud();    // load all CRUD tables once
+</script>
 </body>
-
 </html>
