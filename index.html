@@ -698,6 +698,60 @@ select option{background:var(--surface)}
 .amr-btn-danger{background:var(--red);color:#fff}
 .amr-btn-full{width:100%;justify-content:center}
 .amr-btn:disabled{opacity:.3;cursor:default}
+
+/* ═══════════════════════════════════════════════════════════════
+   SIMULATION TAB
+════════════════════════════════════════════════════════════════ */
+#tab-sim{padding:0;height:calc(100vh - 110px);display:none;position:relative}
+#tab-sim.active{display:flex!important}
+.sim-sidebar{
+  width:320px;min-width:280px;background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;
+}
+.sim-viewport{flex:1;position:relative;background:#0d1117}
+#sim-canvas{width:100%;height:100%;display:block}
+.sim-panel{padding:14px 16px;border-bottom:1px solid var(--border)}
+.sim-panel-title{
+  font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:8px;font-weight:700;
+}
+.sim-row{display:flex;gap:6px;margin-bottom:6px;align-items:center}
+.sim-lbl{font-family:var(--mono);font-size:10px;color:var(--muted);min-width:60px}
+.sim-val{font-family:var(--mono);font-size:11px;color:var(--text)}
+.sim-btn{
+  padding:6px 12px;border:none;border-radius:6px;font-family:var(--mono);font-size:11px;
+  cursor:pointer;font-weight:600;transition:opacity .15s;
+}
+.sim-btn:hover{opacity:.85}
+.sim-btn:disabled{opacity:.3;cursor:default}
+.sim-btn-primary{background:var(--accent);color:#000}
+.sim-btn-green{background:var(--green);color:#000}
+.sim-btn-danger{background:var(--red);color:#fff}
+.sim-btn-ghost{background:var(--border);color:var(--text)}
+.sim-file-drop{
+  border:2px dashed var(--border2);border-radius:8px;padding:20px;text-align:center;
+  color:var(--muted);font-family:var(--mono);font-size:10px;cursor:pointer;
+  transition:border-color .2s,background .2s;
+}
+.sim-file-drop:hover,.sim-file-drop.drag-over{border-color:var(--accent);background:rgba(0,224,255,.04)}
+.sim-robot-item{
+  display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;
+  background:var(--bg);margin-bottom:4px;font-family:var(--mono);font-size:11px;
+}
+.sim-robot-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sim-overlay{
+  position:absolute;top:12px;right:12px;display:flex;flex-direction:column;gap:6px;
+  pointer-events:none;z-index:10;
+}
+.sim-overlay>*{pointer-events:auto}
+.sim-hud{
+  background:rgba(13,17,23,.85);backdrop-filter:blur(6px);border:1px solid var(--border);
+  border-radius:8px;padding:8px 12px;font-family:var(--mono);font-size:10px;color:var(--muted);
+}
+.sim-crosshair{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:20px;height:20px;pointer-events:none;opacity:.3;display:none;
+}
 </style>
 <body>
 
@@ -730,6 +784,7 @@ select option{background:var(--surface)}
   <button class="tab-btn" data-tab="camera">📷 Robot Camera</button>
   <button class="tab-btn" data-tab="orders">📦 Orders <span class="cnt" id="cnt-orders">0</span></button>
   <button class="tab-btn" data-tab="amr">🤖 AMR Control</button>
+  <button class="tab-btn" data-tab="sim">🌐 Simulation</button>
 </nav>
 
 <!-- ══════════════════════════════════════════════════════════════
@@ -823,8 +878,8 @@ select option{background:var(--surface)}
       <button class="btn btn-primary btn-sm" onclick="openAdd('robots')">+ Add Robot</button>
     </div>
     <div class="table-wrap">
-      <table><thead><tr><th>#</th><th>Robot Code</th><th>Description</th><th></th></tr></thead>
-      <tbody id="body-robots"><tr class="state-row"><td colspan="4"><span class="spinner"></span>Loading…</td></tr></tbody></table>
+      <table><thead><tr><th>#</th><th>Robot Code</th><th>Description</th><th>Status</th><th>IP Address</th><th>Home (x, y)</th><th></th></tr></thead>
+      <tbody id="body-robots"><tr class="state-row"><td colspan="7"><span class="spinner"></span>Loading…</td></tr></tbody></table>
     </div>
   </div>
 </div>
@@ -1007,13 +1062,26 @@ select option{background:var(--surface)}
 ════════════════════════════════════════════════════════════════ -->
 <div class="tab-panel" id="tab-amr">
 
-  <!-- ROS Connection bar -->
-  <div class="ros-bar">
-    <div class="ros-dot" id="ros-dot"></div>
-    <input id="ros-ip" value="192.168.1.250" placeholder="ROS Bridge IP"/>
-    <button class="amr-btn amr-btn-accent" onclick="rosConnect()">Connect</button>
-    <button class="amr-btn amr-btn-ghost"  onclick="rosDisconnect()">Disconnect</button>
-    <span class="ros-status-txt" id="ros-status-txt">Not connected</span>
+  <!-- Robot Fleet Connection Bar -->
+  <div class="ros-bar" style="flex-wrap:wrap">
+    <!-- Active robot selector -->
+    <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:260px">
+      <label style="font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Active Robot</label>
+      <select id="amr-robot-select" onchange="switchActiveRobot(this.value)" style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:11px;padding:6px 10px;outline:none">
+        <option value="">— select robot —</option>
+      </select>
+      <div class="ros-dot" id="ros-dot"></div>
+      <span class="ros-status-txt" id="ros-status-txt">Not connected</span>
+    </div>
+    <!-- Connection controls for selected robot -->
+    <div style="display:flex;align-items:center;gap:6px">
+      <label style="font-family:var(--mono);font-size:9px;color:var(--muted);white-space:nowrap">IP</label>
+      <input id="ros-ip" value="" placeholder="IP auto-filled from DB" style="width:140px;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:11px;padding:6px 10px;outline:none"/>
+      <button class="amr-btn amr-btn-accent" onclick="rosConnect()">Connect</button>
+      <button class="amr-btn amr-btn-ghost"  onclick="rosDisconnect()">Disconnect</button>
+    </div>
+    <!-- Fleet overview (mini status of all robots) -->
+    <div id="fleet-dots" style="display:flex;gap:10px;align-items:center;margin-left:auto;padding-left:12px;border-left:1px solid var(--border2)"></div>
   </div>
 
   <div class="amr-layout">
@@ -1160,6 +1228,49 @@ select option{background:var(--surface)}
         </div>
       </div>
 
+      <!-- SLAM Control -->
+      <div class="amr-card" id="slam-card">
+        <div class="amr-card-hdr">
+          <div class="amr-card-title">SLAM / Map Manager</div>
+          <span id="slam-mode-badge" class="ns-val idle" style="font-size:9px">IDLE</span>
+        </div>
+        <div class="amr-card-body">
+
+          <!-- Saved maps selector -->
+          <div style="margin-bottom:8px">
+            <label style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:3px">Saved Maps</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <select id="slam-map-select"
+                style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:12px;padding:6px 8px;border-radius:6px;outline:none">
+                <option value="">— no maps loaded —</option>
+              </select>
+              <button class="amr-btn amr-btn-ghost" onclick="listMaps()" title="Refresh map list" style="padding:6px 8px">🔄</button>
+            </div>
+          </div>
+
+          <!-- Load map / Stop nav -->
+          <div style="display:flex;gap:6px;margin-bottom:10px">
+            <button class="amr-btn amr-btn-green" id="slam-load-btn" onclick="loadMap()" style="flex:1">🗺️ Load Map & Navigate</button>
+            <button class="amr-btn amr-btn-danger" id="slam-stopnav-btn" onclick="stopNav()" disabled style="flex:1">⏹ Stop Navigation</button>
+          </div>
+
+          <div style="border-top:1px solid var(--border2);margin:6px 0 8px;opacity:.4"></div>
+
+          <!-- Create new map via SLAM -->
+          <label style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:3px">Create New Map</label>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <button class="amr-btn amr-btn-accent" id="slam-start-btn" onclick="startSlam()" style="flex:1">▶ Start SLAM</button>
+            <button class="amr-btn amr-btn-danger"  id="slam-stop-btn"  onclick="stopSlam()" disabled style="flex:1">■ Stop SLAM</button>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="text" id="slam-map-name" placeholder="map name" value="warehouse_map"
+              style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:12px;padding:6px 8px;border-radius:6px;outline:none"/>
+            <button class="amr-btn amr-btn-green" id="slam-save-btn" onclick="saveMap()">💾 Save</button>
+          </div>
+          <div id="slam-status-text" style="margin-top:6px;font-family:var(--mono);font-size:10px;color:var(--muted);min-height:16px"></div>
+        </div>
+      </div>
+
       <!-- Mission Planner (multi-waypoint) -->
       <div class="amr-card">
         <div class="amr-card-hdr">
@@ -1240,6 +1351,112 @@ select option{background:var(--surface)}
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════
+     SIMULATION TAB
+════════════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-sim">
+
+  <!-- Sidebar -->
+  <div class="sim-sidebar">
+
+    <!-- URDF Upload -->
+    <div class="sim-panel">
+      <div class="sim-panel-title">Robot Model (URDF)</div>
+      <div class="sim-file-drop" id="sim-urdf-drop"
+           onclick="document.getElementById('sim-urdf-input').click()">
+        📦 Drop URDF file here or click to browse
+      </div>
+      <input type="file" id="sim-urdf-input" accept=".urdf,.xacro,.xml" style="display:none"/>
+      <div id="sim-urdf-name" style="margin-top:6px;font-family:var(--mono);font-size:10px;color:var(--green);min-height:14px"></div>
+      <div style="margin-top:8px">
+        <label style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:3px">Or load from URL</label>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="sim-urdf-url" placeholder="https://…/robot.urdf"
+            style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:11px;padding:6px 8px;border-radius:6px;outline:none"/>
+          <button class="sim-btn sim-btn-primary" onclick="simLoadUrdfFromUrl()">Load</button>
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <button class="sim-btn sim-btn-ghost" style="width:100%" onclick="simLoadDefaultRobot()">🤖 Load TurtleBot3 (Built-in)</button>
+      </div>
+    </div>
+
+    <!-- Scene Controls -->
+    <div class="sim-panel">
+      <div class="sim-panel-title">Scene</div>
+      <div class="sim-row">
+        <button class="sim-btn sim-btn-ghost" onclick="simToggleGrid()" id="sim-grid-btn" style="flex:1">Grid: ON</button>
+        <button class="sim-btn sim-btn-ghost" onclick="simToggleAxes()" id="sim-axes-btn" style="flex:1">Axes: ON</button>
+      </div>
+      <div class="sim-row">
+        <button class="sim-btn sim-btn-ghost" onclick="simToggleLidar()" id="sim-lidar-btn" style="flex:1">LiDAR: ON</button>
+        <button class="sim-btn sim-btn-ghost" onclick="simTogglePath()" id="sim-path-btn" style="flex:1">Path: ON</button>
+      </div>
+      <div class="sim-row">
+        <button class="sim-btn sim-btn-ghost" onclick="simToggleWaypoints()" id="sim-wp-btn" style="flex:1">Waypts: ON</button>
+        <button class="sim-btn sim-btn-ghost" onclick="simToggleMap()" id="sim-map-btn" style="flex:1">Map: OFF</button>
+      </div>
+      <div class="sim-row">
+        <button class="sim-btn sim-btn-ghost" onclick="simResetCamera()" style="flex:1">⊙ Reset View</button>
+      </div>
+      <div class="sim-row">
+        <span class="sim-lbl">BG Color</span>
+        <input type="color" id="sim-bg-color" value="#0d1117" onchange="simSetBg(this.value)"
+          style="width:32px;height:24px;border:1px solid var(--border2);border-radius:4px;background:none;cursor:pointer"/>
+      </div>
+    </div>
+
+    <!-- Robot Fleet -->
+    <div class="sim-panel">
+      <div class="sim-panel-title">Robot Fleet</div>
+      <div id="sim-robot-list">
+        <div style="color:var(--muted);font-family:var(--mono);font-size:10px;padding:8px;text-align:center">
+          Connect to robots in AMR tab first
+        </div>
+      </div>
+    </div>
+
+    <!-- Pose Information -->
+    <div class="sim-panel">
+      <div class="sim-panel-title">Pose</div>
+      <div class="sim-row"><span class="sim-lbl">X</span><span class="sim-val" id="sim-pose-x">—</span></div>
+      <div class="sim-row"><span class="sim-lbl">Y</span><span class="sim-val" id="sim-pose-y">—</span></div>
+      <div class="sim-row"><span class="sim-lbl">Yaw</span><span class="sim-val" id="sim-pose-yaw">—</span></div>
+      <div class="sim-row"><span class="sim-lbl">Mode</span><span class="sim-val" id="sim-mode-txt">Orbit</span></div>
+    </div>
+
+    <!-- Interaction -->
+    <div class="sim-panel">
+      <div class="sim-panel-title">Interaction</div>
+      <div class="sim-row">
+        <button class="sim-btn sim-btn-green" id="sim-goal-btn" onclick="simToggleGoalMode()" style="flex:1">🎯 Click to Set Goal</button>
+      </div>
+      <div class="sim-row">
+        <button class="sim-btn sim-btn-ghost" onclick="simFollowRobot()" style="flex:1">📍 Follow Robot</button>
+        <button class="sim-btn sim-btn-ghost" onclick="simTopView()" style="flex:1">⬆ Top View</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 3D Viewport -->
+  <div class="sim-viewport">
+    <canvas id="sim-canvas"></canvas>
+    <!-- HUD overlay -->
+    <div class="sim-overlay">
+      <div class="sim-hud" id="sim-fps-hud">FPS: —</div>
+      <div class="sim-hud" id="sim-cursor-hud">World: — , —</div>
+    </div>
+    <svg class="sim-crosshair" id="sim-crosshair" viewBox="0 0 20 20">
+      <line x1="10" y1="2" x2="10" y2="8" stroke="#00e0ff" stroke-width="1"/>
+      <line x1="10" y1="12" x2="10" y2="18" stroke="#00e0ff" stroke-width="1"/>
+      <line x1="2" y1="10" x2="8" y2="10" stroke="#00e0ff" stroke-width="1"/>
+      <line x1="12" y1="10" x2="18" y2="10" stroke="#00e0ff" stroke-width="1"/>
+    </svg>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
      MODALS
 ════════════════════════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="form-modal">
@@ -1283,6 +1500,7 @@ const WS_URL = 'ws://localhost:8000/ws';
 let feed       = [];          // array of enriched scan objects (max 20)
 let _products  = [];
 let _locations = [];
+let _robots    = [];
 let modalCtx   = {};
 let ws         = null;
 
@@ -1449,22 +1667,28 @@ async function loadCrud() {
     ]);
     _products  = prods;
     _locations = locs;
+    _robots    = robots;
     renderRobots(robots);
     renderLocations(locs);
     renderProducts(prods);
     renderInventory(inv);
     renderScanlogs(logs);
+    populateRobotSelect();
   } catch(e) { console.error('CRUD load failed:', e); }
 }
 
 function renderRobots(data) {
   setCount('cnt-robots', data.length);
   const tb = document.getElementById('body-robots');
-  if (!data.length) { emptyRow(tb, 4); return; }
+  if (!data.length) { emptyRow(tb, 7); return; }
+  const stCls = s => s === 'IDLE' ? 'COMPLETED' : s === 'BUSY' ? 'IN_PROGRESS' : 'PENDING';
   tb.innerHTML = data.map(r => `<tr>
     <td class="id">${esc(r.id)}</td>
     <td class="code">${esc(r.robot_code)}</td>
     <td>${esc(r.description??'—')}</td>
+    <td><span class="order-status ${stCls(r.status)}">${esc(r.status??'IDLE')}</span></td>
+    <td style="font-family:var(--mono);font-size:11px">${esc(r.ip_address??'—')}</td>
+    <td style="font-size:11px;font-family:var(--mono)">${r.home_x != null ? Number(r.home_x).toFixed(3) : '—'}, ${r.home_y != null ? Number(r.home_y).toFixed(3) : '—'}</td>
     <td class="acts">
       <button class="btn btn-ghost btn-sm" onclick='openEdit("robots",${r.id},${jq(r)})'>Edit</button>
       <button class="btn btn-danger btn-sm" onclick='confirmDel("robots",${r.id},"${esc(r.robot_code)}")'>Del</button>
@@ -1543,6 +1767,11 @@ const FORMS = {
   robots: () => `<div class="form-grid">
     <div class="field full"><label>Robot Code *</label><input id="f0" placeholder="AMR_01"/></div>
     <div class="field full"><label>Description</label><input id="f1" placeholder="Main floor robot"/></div>
+    <div class="field"><label>Status</label><select id="f2"><option value="IDLE">IDLE</option><option value="BUSY">BUSY</option><option value="OFFLINE">OFFLINE</option><option value="CHARGING">CHARGING</option></select></div>
+    <div class="field"><label>IP Address</label><input id="f3" placeholder="192.168.1.56"/></div>
+    <div class="field"><label>Home X</label><input id="f4" type="number" step="0.001" placeholder="-1.296"/></div>
+    <div class="field"><label>Home Y</label><input id="f5" type="number" step="0.001" placeholder="-0.049"/></div>
+    <div class="field"><label>Home Yaw</label><input id="f6" type="number" step="0.001" placeholder="0.185"/></div>
   </div>`,
 
   locations: () => `<div class="form-grid">
@@ -1589,7 +1818,7 @@ function openEdit(table, id, row) {
   document.getElementById('form-modal').classList.add('open');
   // pre-fill
   const fill = (fid, v) => { const el=document.getElementById(fid); if(el) el.value = v??''; };
-  if (table==='robots')     { fill('f0',row.robot_code);   fill('f1',row.description); }
+  if (table==='robots')     { fill('f0',row.robot_code);   fill('f1',row.description); fill('f2',row.status); fill('f3',row.ip_address); fill('f4',row.home_x); fill('f5',row.home_y); fill('f6',row.home_yaw); }
   if (table==='locations')  { fill('f0',row.location_code);fill('f1',row.rack);fill('f2',row.slot); }
   if (table==='products')   { fill('f0',row.product_code); fill('f1',row.name);fill('f2',row.category); }
   if (table==='inventory')  { fill('f0',row.product_id);   fill('f1',row.location_id);fill('f2',row.quantity); }
@@ -1602,7 +1831,7 @@ async function saveRecord() {
   const { table, mode, id } = modalCtx;
   let body = {};
 
-  if (table==='robots')    { body={robot_code:getv('f0'),description:getv('f1')}; if(!body.robot_code){toast('Robot Code required','err');return;} }
+  if (table==='robots')    { body={robot_code:getv('f0'),description:getv('f1'),status:getv('f2'),ip_address:getv('f3')||null,home_x:getv('f4')?+getv('f4'):null,home_y:getv('f5')?+getv('f5'):null,home_yaw:getv('f6')?+getv('f6'):null}; if(!body.robot_code){toast('Robot Code required','err');return;} }
   if (table==='locations') { body={location_code:getv('f0'),rack:getv('f1'),slot:getv('f2')}; if(!body.location_code){toast('Location Code required','err');return;} }
   if (table==='products')  { body={product_code:getv('f0'),name:getv('f1'),category:getv('f2')}; if(!body.product_code){toast('Product Code required','err');return;} }
   if (table==='inventory') {
@@ -1825,8 +2054,16 @@ function ensureRosLibs(cb) {
 let ros = null;
 let rosConnected = false;
 
+// Multi-robot connection map: { robot_code: { ros, connected, ip } }
+let rosConnections = {};
+let activeRobotCode = null;    // currently selected robot_code
+
 // Operating mode: 'manual' | 'auto'
 let amrMode = 'manual';
+
+// SLAM state
+let slamState = 'IDLE';  // IDLE | MAPPING | SAVING | SAVED | NAV | LOADING | ERROR
+let topicSlamCmd = null, topicSlamStatus = null, topicSlamMapList = null;
 
 // Current robot pose (map frame)
 let robotX = null, robotY = null, robotYaw = null;
@@ -1894,38 +2131,122 @@ const PRESETS = [
   { name: 'Point D — Rack 4', x: -0.534,   y:  0.278,    yaw:  3.14159, color: '#9b59b6' },
 ];
 
+// ── Multi-robot fleet UI ──────────────────────────────────────
+
+function populateRobotSelect() {
+  const sel = document.getElementById('amr-robot-select');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— select robot —</option>' +
+    _robots.map(r => `<option value="${esc(r.robot_code)}">${esc(r.robot_code)} — ${esc(r.description ?? '')}</option>`).join('');
+  // restore previous selection
+  if (prev && _robots.some(r => r.robot_code === prev)) sel.value = prev;
+  renderFleetDots();
+}
+
+function renderFleetDots() {
+  const wrap = document.getElementById('fleet-dots');
+  if (!wrap) return;
+  wrap.innerHTML = _robots.map(r => {
+    const conn = rosConnections[r.robot_code];
+    const on = conn?.connected;
+    return `<div style="display:flex;align-items:center;gap:3px;cursor:pointer" title="${esc(r.robot_code)} — ${on ? 'Connected' : 'Offline'}${r.ip_address ? ' ('+esc(r.ip_address)+')' : ''}" onclick="document.getElementById('amr-robot-select').value='${esc(r.robot_code)}';switchActiveRobot('${esc(r.robot_code)}')">
+      <div class="ros-dot${on ? ' on' : ''}" style="width:6px;height:6px"></div>
+      <span style="font-family:var(--mono);font-size:9px;color:${on ? 'var(--green)' : 'var(--muted)'}">${esc(r.robot_code)}</span>
+    </div>`;
+  }).join('');
+}
+
+function switchActiveRobot(code) {
+  activeRobotCode = code || null;
+  const robot = _robots.find(r => r.robot_code === code);
+  // Fill IP from DB
+  document.getElementById('ros-ip').value = robot?.ip_address ?? '';
+
+  // Switch active ros connection
+  const conn = rosConnections[code];
+  if (conn?.connected) {
+    ros = conn.ros;
+    rosConnected = true;
+    rosSetStatus('Connected — ' + (robot?.ip_address ?? code), true);
+    setupTopics();
+    initAMRMap();
+  } else {
+    ros = null;
+    rosConnected = false;
+    rosSetStatus(code ? 'Not connected' : 'Select a robot', false);
+  }
+  renderFleetDots();
+}
+
 // ── ROS connection ────────────────────────────────────────────
 
 function rosConnect() {
-  ensureRosLibs(() => {
-    if (ros) { try { ros.close(); } catch(e){} }
-    const ip = document.getElementById('ros-ip').value.trim();
-    rosSetStatus('Connecting…', false);
-    ros = new ROSLIB.Ros({ url: 'ws://' + ip + ':9090' });
+  const code = activeRobotCode;
+  if (!code) { toast('Select a robot first', 'err'); return; }
+  const ip = document.getElementById('ros-ip').value.trim();
+  if (!ip) { toast('Enter IP address', 'err'); return; }
 
-    ros.on('connection', () => {
-      rosConnected = true;
-      rosSetStatus('Connected — ' + ip, true);
-      setupTopics();
-      initAMRMap();
-      initPIDCharts();
-      buildPresets();
+  // Save IP back to DB if changed
+  const robot = _robots.find(r => r.robot_code === code);
+  if (robot && robot.ip_address !== ip) {
+    api('/robots/' + robot.id, { method: 'PUT', body: JSON.stringify({ ip_address: ip }) }).catch(() => {});
+    robot.ip_address = ip;
+  }
+
+  ensureRosLibs(() => {
+    // Close existing connection for this robot if any
+    if (rosConnections[code]?.ros) {
+      try { rosConnections[code].ros.close(); } catch(e) {}
+    }
+
+    rosSetStatus('Connecting…', false);
+    const newRos = new ROSLIB.Ros({ url: 'ws://' + ip + ':9090' });
+
+    rosConnections[code] = { ros: newRos, connected: false, ip };
+
+    newRos.on('connection', () => {
+      rosConnections[code].connected = true;
+      if (activeRobotCode === code) {
+        ros = newRos;
+        rosConnected = true;
+        rosSetStatus('Connected — ' + ip, true);
+        setupTopics();
+        initAMRMap();
+        initPIDCharts();
+        buildPresets();
+      }
+      renderFleetDots();
     });
-    ros.on('error', (e) => {
-      rosConnected = false;
-      rosSetStatus('Connection error', false);
+    newRos.on('error', () => {
+      rosConnections[code].connected = false;
+      if (activeRobotCode === code) {
+        rosConnected = false;
+        rosSetStatus('Connection error', false);
+      }
+      renderFleetDots();
     });
-    ros.on('close', () => {
-      rosConnected = false;
-      rosSetStatus('Disconnected', false);
+    newRos.on('close', () => {
+      rosConnections[code].connected = false;
+      if (activeRobotCode === code) {
+        ros = null;
+        rosConnected = false;
+        rosSetStatus('Disconnected', false);
+      }
+      renderFleetDots();
     });
   });
 }
 
 function rosDisconnect() {
-  if (ros) { try { ros.close(); } catch(e){} ros = null; }
+  const code = activeRobotCode;
+  if (code && rosConnections[code]?.ros) {
+    try { rosConnections[code].ros.close(); } catch(e) {}
+    rosConnections[code] = { ros: null, connected: false, ip: rosConnections[code]?.ip };
+  }
+  ros = null;
   rosConnected = false;
   rosSetStatus('Disconnected', false);
+  renderFleetDots();
 }
 
 function rosSetStatus(msg, online) {
@@ -2074,6 +2395,21 @@ function setupTopics() {
     pidActL = v - (w * WHEEL_BASE / 2);
     pidActR = v + (w * WHEEL_BASE / 2);
   });
+
+  // ── SLAM control topics
+  topicSlamCmd = new ROSLIB.Topic({ ros, name: '/slam/command', messageType: 'std_msgs/msg/String' });
+  topicSlamStatus = new ROSLIB.Topic({ ros, name: '/slam/status', messageType: 'std_msgs/msg/String' });
+  topicSlamStatus.subscribe(msg => {
+    updateSlamUI(msg.data);
+  });
+  topicSlamMapList = new ROSLIB.Topic({ ros, name: '/slam/map_list', messageType: 'std_msgs/msg/String' });
+  topicSlamMapList.subscribe(msg => {
+    populateMapList(msg.data);
+  });
+  // Request map list on connect
+  setTimeout(() => {
+    topicSlamCmd.publish(new ROSLIB.Message({ data: 'list_maps' }));
+  }, 500);
 }
 
 // ── Map initialisation ────────────────────────────────────────
@@ -2240,6 +2576,7 @@ function drawLiDAR() {
 }
 
 function drawRobot() {
+  if (robotX === null || robotY === null || robotYaw === null) return;
   const ctx = mapCtx;
   const c = worldToCanvas(robotX, robotY);
   const r = Math.max(8, mapScale * 0.18);
@@ -2483,6 +2820,109 @@ function toggleLayer(layer, on) {
   if (layer === 'path')  pathVisible  = on;
   if (layer === 'hist')  histVisible  = on;
   redrawMap();
+}
+
+// ── SLAM Control ──────────────────────────────────────────────
+
+function listMaps() {
+  if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
+  topicSlamCmd.publish(new ROSLIB.Message({ data: 'list_maps' }));
+}
+
+function loadMap() {
+  if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
+  const sel = document.getElementById('slam-map-select');
+  const mapname = sel.value;
+  if (!mapname) { toast('Select a map first', 'err'); return; }
+  topicSlamCmd.publish(new ROSLIB.Message({ data: 'load_map:' + mapname }));
+  toast('Loading map "' + mapname + '"…');
+}
+
+function stopNav() {
+  if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
+  topicSlamCmd.publish(new ROSLIB.Message({ data: 'stop_nav' }));
+  toast('Stopping navigation…');
+}
+
+function startSlam() {
+  if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
+  if (slamState === 'MAPPING') { toast('SLAM already running', 'err'); return; }
+  topicSlamCmd.publish(new ROSLIB.Message({ data: 'start_slam' }));
+  toast('Starting SLAM…');
+}
+
+function stopSlam() {
+  if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
+  topicSlamCmd.publish(new ROSLIB.Message({ data: 'stop_slam' }));
+  toast('Stopping SLAM…');
+}
+
+function saveMap() {
+  if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
+  const name = document.getElementById('slam-map-name').value.trim();
+  if (!name) { toast('Enter a map name', 'err'); return; }
+  topicSlamCmd.publish(new ROSLIB.Message({ data: 'save_map:' + name }));
+  toast('Saving map "' + name + '"…');
+}
+
+function populateMapList(jsonStr) {
+  let maps = [];
+  try { maps = JSON.parse(jsonStr); } catch(e) { return; }
+  const sel = document.getElementById('slam-map-select');
+  const prev = sel.value;
+  sel.innerHTML = maps.length
+    ? maps.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('')
+    : '<option value="">— no maps found —</option>';
+  // Restore previous selection if still available
+  if (prev && maps.includes(prev)) sel.value = prev;
+}
+
+function updateSlamUI(state) {
+  slamState = state;
+  const badge   = document.getElementById('slam-mode-badge');
+  const startB  = document.getElementById('slam-start-btn');
+  const stopB   = document.getElementById('slam-stop-btn');
+  const saveB   = document.getElementById('slam-save-btn');
+  const loadB   = document.getElementById('slam-load-btn');
+  const stopNB  = document.getElementById('slam-stopnav-btn');
+  const statusT = document.getElementById('slam-status-text');
+
+  const isMapping  = state === 'MAPPING';
+  const isSaving   = state === 'SAVING';
+  const isNav      = state.startsWith('NAV:');
+  const isLoading  = state.startsWith('LOADING:');
+  const isBusy     = isSaving || isLoading;
+
+  // Badge
+  if (isMapping)                       { badge.textContent = 'MAPPING';    badge.className = 'ns-val nav'; }
+  else if (isLoading)                  { badge.textContent = 'LOADING';    badge.className = 'ns-val nav'; }
+  else if (isNav)                      { badge.textContent = 'NAVIGATING'; badge.className = 'ns-val ok'; }
+  else if (isSaving)                   { badge.textContent = 'SAVING';     badge.className = 'ns-val nav'; }
+  else if (state.startsWith('SAVED'))  { badge.textContent = 'SAVED';      badge.className = 'ns-val ok'; }
+  else if (state.startsWith('ERROR'))  { badge.textContent = 'ERROR';      badge.className = 'ns-val err'; }
+  else                                 { badge.textContent = 'IDLE';       badge.className = 'ns-val idle'; }
+
+  // SLAM buttons
+  startB.disabled = isMapping || isBusy || isNav || isLoading;
+  stopB.disabled  = !isMapping;
+  saveB.disabled  = !isMapping && !state.startsWith('SAVED');
+
+  // Navigation buttons
+  loadB.disabled  = isMapping || isBusy || isLoading;
+  stopNB.disabled = !isNav;
+
+  // Disable nav auto-mode while SLAM is mapping
+  const navMode = document.getElementById('amr-mode-auto');
+  if (navMode) navMode.disabled = isMapping;
+
+  // Status text
+  if (isNav)                            statusT.textContent = '🗺️ Navigating with map: ' + state.substring(4);
+  else if (isLoading)                   statusT.textContent = '⏳ Loading map: ' + state.substring(8) + '…';
+  else if (state.startsWith('SAVED:'))  statusT.textContent = '✓ Map saved: ' + state.substring(6);
+  else if (state.startsWith('ERROR:'))  statusT.textContent = '✗ ' + state.substring(6);
+  else if (isMapping)                   statusT.textContent = 'SLAM active — drive the robot to build the map';
+  else if (isSaving)                    statusT.textContent = 'Saving map…';
+  else                                  statusT.textContent = '';
 }
 
 // ── Navigation ────────────────────────────────────────────────
@@ -2762,7 +3202,8 @@ function initPIDCharts() {
   amrChartL = new Chart(cL.getContext('2d'), { type:'line', data: mkData(), options: opts });
   amrChartR = new Chart(cR.getContext('2d'), { type:'line', data: mkData(), options: opts });
 
-  setInterval(() => {
+  if (window._pidChartInterval) clearInterval(window._pidChartInterval);
+  window._pidChartInterval = setInterval(() => {
     if (!amrChartL) return;
     if (rosConnected && topicCmdVel) {
       // target from last published cmd_vel
@@ -2865,10 +3306,11 @@ function openCreateOrder() {
   modalCtx = { table: '_order', mode: 'add' };
   document.getElementById('modal-title').textContent = 'Create Pick Order';
   const pOpts = _products.map(p => `<option value="${p.id}">${esc(p.product_code)} — ${esc(p.name ?? '')}</option>`).join('');
+  const rOpts = _robots.filter(r => r.status === 'IDLE' || r.status === 'CHARGING').map(r => `<option value="${esc(r.robot_code)}">${esc(r.robot_code)} — ${esc(r.description ?? '')}</option>`).join('');
   document.getElementById('modal-body').innerHTML = `
     <div class="form-grid one">
       <div class="field"><label>Order Code *</label><input id="f-oc" placeholder="ORD-001"/></div>
-      <div class="field"><label>Assigned Robot</label><input id="f-ar" placeholder="AMR_01" value="AMR_01"/></div>
+      <div class="field"><label>Assigned Robot</label><select id="f-ar"><option value="">Auto-assign</option>${rOpts}</select></div>
     </div>
     <div style="margin:10px 0 4px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">
       Items <button class="btn btn-ghost btn-sm" onclick="addOrderItemRow()" style="margin-left:8px">+ Add Item</button>
@@ -2976,6 +3418,752 @@ async function loadOrderToMission(oid) {
     document.getElementById('tab-amr').classList.add('active');
     toast('Loaded ' + missionWaypoints.length + ' waypoints from order');
   } catch(e) { toast(e.message, 'err'); }
+}
+
+/* ════════════════════════════════════════════════════════════
+   SIMULATION TAB — Three.js + URDF
+════════════════════════════════════════════════════════════ */
+
+let simScene, simCamera, simRenderer, simControls, simClock;
+let simRobotGroup = null;       // current URDF robot mesh group
+let simGridHelper = null;
+let simAxesHelper = null;
+let simMapMesh = null;          // occupancy grid as 3D plane
+let simGoalMode = false;
+let simFollowing = false;
+let simInitialized = false;
+let simAnimating = false;
+let simRaycaster, simMouse;
+let simGoalMarker = null;
+let simRobotMarkers = {};       // { robotCode: meshGroup }
+let simFrameCount = 0;
+let simLastFpsTime = 0;
+const SIM_ROBOT_HEIGHT = 0.15;  // z-offset to keep robot above ground
+
+// 3D overlay objects
+let simLidarPoints = null;      // THREE.Points for LiDAR cloud
+let simPathLine = null;         // THREE.Line for nav path
+let simWaypointMarkers = [];    // array of THREE.Mesh for mission waypoints
+let simLidarOn = true, simPathOn = true, simWaypointsOn = true;
+
+// Deferred loader — load Three.js + URDFLoader on first tab visit
+let simLibsLoaded = false;
+let simLibsLoading = false;
+
+function ensureSimLibs(cb) {
+  if (simLibsLoaded) { cb(); return; }
+  if (simLibsLoading) { const iv = setInterval(() => { if (simLibsLoaded) { clearInterval(iv); cb(); } }, 100); return; }
+  simLibsLoading = true;
+
+  const THREE_CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0';
+  loadScript(THREE_CDN + '/build/three.min.js', () => {
+    // OrbitControls as global
+    loadScript(THREE_CDN + '/examples/js/controls/OrbitControls.js', () => {
+      // URDFLoader
+      loadScript('https://cdn.jsdelivr.net/npm/urdf-loader@0.12.4/src/URDFLoader.js', () => {
+        simLibsLoaded = true;
+        cb();
+      });
+    });
+  });
+}
+
+// ── Init 3D scene ─────────────────────────────────────────────
+function simInit() {
+  if (simInitialized) return;
+  simInitialized = true;
+
+  const canvas = document.getElementById('sim-canvas');
+  const container = canvas.parentElement;
+
+  // Renderer
+  simRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  simRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  simRenderer.shadowMap.enabled = true;
+  simRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  simRenderer.outputColorSpace = THREE.SRGBColorSpace;
+  simRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+  simRenderer.toneMappingExposure = 1.0;
+
+  // Scene
+  simScene = new THREE.Scene();
+  simScene.background = new THREE.Color(0x0d1117);
+  simScene.fog = new THREE.FogExp2(0x0d1117, 0.035);
+
+  // Camera
+  simCamera = new THREE.PerspectiveCamera(55, container.clientWidth / container.clientHeight, 0.05, 200);
+  simCamera.position.set(3, 3, 3);
+  simCamera.lookAt(0, 0, 0);
+
+  // Controls
+  simControls = new THREE.OrbitControls(simCamera, simRenderer.domElement);
+  simControls.enableDamping = true;
+  simControls.dampingFactor = 0.08;
+  simControls.minDistance = 0.5;
+  simControls.maxDistance = 50;
+  simControls.maxPolarAngle = Math.PI / 2 + 0.1;
+  simControls.target.set(0, 0, 0);
+
+  // Clock
+  simClock = new THREE.Clock();
+
+  // Raycaster
+  simRaycaster = new THREE.Raycaster();
+  simMouse = new THREE.Vector2();
+
+  // ── Lights ──
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+  simScene.add(ambientLight);
+
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  dirLight.position.set(5, 10, 5);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(2048, 2048);
+  dirLight.shadow.camera.near = 0.5;
+  dirLight.shadow.camera.far = 30;
+  dirLight.shadow.camera.left = -10;
+  dirLight.shadow.camera.right = 10;
+  dirLight.shadow.camera.top = 10;
+  dirLight.shadow.camera.bottom = -10;
+  simScene.add(dirLight);
+
+  const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x362a28, 0.5);
+  simScene.add(hemiLight);
+
+  // ── Ground plane (subtle) ──
+  const groundGeo = new THREE.PlaneGeometry(60, 60);
+  const groundMat = new THREE.MeshStandardMaterial({ color: 0x151b26, roughness: 0.95 });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.005;
+  ground.receiveShadow = true;
+  ground.name = 'ground';
+  simScene.add(ground);
+
+  // ── Grid ──
+  simGridHelper = new THREE.GridHelper(20, 40, 0x1a2944, 0x111a2a);
+  simScene.add(simGridHelper);
+
+  // ── Axes ──
+  simAxesHelper = new THREE.AxesHelper(2);
+  simScene.add(simAxesHelper);
+
+  // ── Goal marker (hidden initially) ──
+  const goalGeo = new THREE.CylinderGeometry(0.05, 0.15, 0.3, 8);
+  const goalMat = new THREE.MeshStandardMaterial({ color: 0x00e0ff, emissive: 0x00e0ff, emissiveIntensity: 0.5 });
+  simGoalMarker = new THREE.Mesh(goalGeo, goalMat);
+  simGoalMarker.visible = false;
+  simGoalMarker.position.y = 0.15;
+  simScene.add(simGoalMarker);
+
+  // ── Events ──
+  window.addEventListener('resize', simResize);
+  new ResizeObserver(simResize).observe(container);
+  canvas.addEventListener('click', simOnClick);
+  canvas.addEventListener('mousemove', simOnMouseMove);
+
+  // ── URDF drag-and-drop ──
+  const drop = document.getElementById('sim-urdf-drop');
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault();
+    drop.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) simLoadUrdfFile(file);
+  });
+  document.getElementById('sim-urdf-input').addEventListener('change', e => {
+    if (e.target.files[0]) simLoadUrdfFile(e.target.files[0]);
+  });
+
+  simResize();
+  simAnimate();
+}
+
+function simResize() {
+  if (!simRenderer) return;
+  const container = simRenderer.domElement.parentElement;
+  const w = container.clientWidth, h = container.clientHeight;
+  simCamera.aspect = w / h;
+  simCamera.updateProjectionMatrix();
+  simRenderer.setSize(w, h, false);
+}
+
+// ── Animation loop ────────────────────────────────────────────
+function simAnimate() {
+  if (!simAnimating) { simAnimating = true; }
+  requestAnimationFrame(simAnimate);
+
+  const delta = simClock.getDelta();
+  simControls.update();
+
+  // FPS counter
+  simFrameCount++;
+  const now = performance.now();
+  if (now - simLastFpsTime >= 1000) {
+    document.getElementById('sim-fps-hud').textContent = 'FPS: ' + simFrameCount;
+    simFrameCount = 0;
+    simLastFpsTime = now;
+  }
+
+  // Follow robot
+  if (simFollowing && robotX !== null && simRobotGroup) {
+    const target = new THREE.Vector3(robotX, SIM_ROBOT_HEIGHT, -robotY);
+    simControls.target.lerp(target, 0.05);
+  }
+
+  // Update robot model pose from ROS data
+  if (simRobotGroup && robotX !== null) {
+    simRobotGroup.position.set(robotX, SIM_ROBOT_HEIGHT, -robotY);
+    simRobotGroup.rotation.y = robotYaw || 0;
+    document.getElementById('sim-pose-x').textContent = robotX.toFixed(3);
+    document.getElementById('sim-pose-y').textContent = robotY.toFixed(3);
+    document.getElementById('sim-pose-yaw').textContent = ((robotYaw || 0) * 180 / Math.PI).toFixed(1) + '°';
+  }
+
+  // Pulse goal marker
+  if (simGoalMarker && simGoalMarker.visible) {
+    simGoalMarker.material.emissiveIntensity = 0.3 + 0.3 * Math.sin(now * 0.005);
+  }
+
+  // Update 3D overlays
+  if (simLidarOn)     simUpdateLidar();
+  if (simPathOn)      simUpdatePath();
+  if (simWaypointsOn) simUpdateWaypoints();
+
+  simRenderer.render(simScene, simCamera);
+}
+
+// ── URDF Loading ──────────────────────────────────────────────
+function simLoadUrdfFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const urdfText = e.target.result;
+    document.getElementById('sim-urdf-name').textContent = '✓ ' + file.name;
+    simParseAndLoadUrdf(urdfText, file.name);
+  };
+  reader.readAsText(file);
+}
+
+function simLoadUrdfFromUrl() {
+  const url = document.getElementById('sim-urdf-url').value.trim();
+  if (!url) return;
+  fetch(url)
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+    .then(text => {
+      document.getElementById('sim-urdf-name').textContent = '✓ Loaded from URL';
+      simParseAndLoadUrdf(text, 'robot.urdf');
+    })
+    .catch(err => toast('Failed to load URDF: ' + err, 'err'));
+}
+
+function simParseAndLoadUrdf(urdfText, filename) {
+  // Remove old robot
+  if (simRobotGroup) {
+    simScene.remove(simRobotGroup);
+    simRobotGroup = null;
+  }
+
+  try {
+    // Parse URDF XML
+    const parser = new DOMParser();
+    const urdfDoc = parser.parseFromString(urdfText, 'text/xml');
+    const robotEl = urdfDoc.querySelector('robot');
+    if (!robotEl) { toast('Invalid URDF: no <robot> element', 'err'); return; }
+
+    const robotName = robotEl.getAttribute('name') || 'robot';
+
+    // Build simple visual representation from URDF links
+    simRobotGroup = new THREE.Group();
+    simRobotGroup.name = robotName;
+
+    const links = urdfDoc.querySelectorAll('link');
+    let hasVisual = false;
+
+    links.forEach(link => {
+      const visual = link.querySelector('visual');
+      if (!visual) return;
+      hasVisual = true;
+
+      const geometry = visual.querySelector('geometry');
+      if (!geometry) return;
+
+      let mesh = null;
+      const box = geometry.querySelector('box');
+      const cylinder = geometry.querySelector('cylinder');
+      const sphere = geometry.querySelector('sphere');
+
+      if (box) {
+        const size = (box.getAttribute('size') || '0.1 0.1 0.1').split(' ').map(Number);
+        mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(size[0], size[2], size[1]),
+          new THREE.MeshStandardMaterial({ color: 0x3b9eff, roughness: 0.4, metalness: 0.3 })
+        );
+      } else if (cylinder) {
+        const r = parseFloat(cylinder.getAttribute('radius') || 0.05);
+        const l = parseFloat(cylinder.getAttribute('length') || 0.1);
+        mesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(r, r, l, 16),
+          new THREE.MeshStandardMaterial({ color: 0x3b9eff, roughness: 0.4, metalness: 0.3 })
+        );
+      } else if (sphere) {
+        const r = parseFloat(sphere.getAttribute('radius') || 0.05);
+        mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(r, 16, 16),
+          new THREE.MeshStandardMaterial({ color: 0x3b9eff, roughness: 0.4, metalness: 0.3 })
+        );
+      }
+
+      if (mesh) {
+        // Apply color from material
+        const matEl = visual.querySelector('material');
+        if (matEl) {
+          const colorEl = matEl.querySelector('color');
+          if (colorEl) {
+            const rgba = (colorEl.getAttribute('rgba') || '0.5 0.5 0.5 1').split(' ').map(Number);
+            mesh.material.color.setRGB(rgba[0], rgba[1], rgba[2]);
+            if (rgba[3] < 1) { mesh.material.transparent = true; mesh.material.opacity = rgba[3]; }
+          }
+        }
+
+        // Apply origin transform
+        const origin = visual.querySelector('origin');
+        if (origin) {
+          const xyz = (origin.getAttribute('xyz') || '0 0 0').split(' ').map(Number);
+          const rpy = (origin.getAttribute('rpy') || '0 0 0').split(' ').map(Number);
+          mesh.position.set(xyz[0], xyz[2], -xyz[1]);
+          mesh.rotation.set(rpy[0], rpy[2], -rpy[1]);
+        }
+
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        simRobotGroup.add(mesh);
+      }
+    });
+
+    // If no visual elements, create a placeholder
+    if (!hasVisual) {
+      simBuildPlaceholderRobot(simRobotGroup);
+    }
+
+    simRobotGroup.position.y = SIM_ROBOT_HEIGHT;
+    simScene.add(simRobotGroup);
+    toast('Loaded robot: ' + robotName);
+
+  } catch (err) {
+    toast('URDF parse error: ' + err.message, 'err');
+  }
+}
+
+// ── Built-in TurtleBot3-style robot ───────────────────────────
+function simLoadDefaultRobot() {
+  if (simRobotGroup) {
+    simScene.remove(simRobotGroup);
+    simRobotGroup = null;
+  }
+
+  simRobotGroup = new THREE.Group();
+  simRobotGroup.name = 'TurtleBot3';
+
+  // Body — flat cylinder
+  const bodyGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.06, 24);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6 });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.y = 0.03;
+  body.castShadow = true;
+  simRobotGroup.add(body);
+
+  // Top plate
+  const plateGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.005, 24);
+  const plateMat = new THREE.MeshStandardMaterial({ color: 0x00e0ff, roughness: 0.3, metalness: 0.6 });
+  const plate = new THREE.Mesh(plateGeo, plateMat);
+  plate.position.y = 0.065;
+  plate.castShadow = true;
+  simRobotGroup.add(plate);
+
+  // LiDAR tower
+  const lidarBase = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.035, 0.035, 0.04, 12),
+    new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.5 })
+  );
+  lidarBase.position.y = 0.088;
+  lidarBase.castShadow = true;
+  simRobotGroup.add(lidarBase);
+
+  const lidarTop = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.03, 0.035, 0.015, 12),
+    new THREE.MeshStandardMaterial({ color: 0x00e0ff, emissive: 0x00e0ff, emissiveIntensity: 0.3 })
+  );
+  lidarTop.position.y = 0.115;
+  simRobotGroup.add(lidarTop);
+
+  // Wheels (left & right)
+  const wheelGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.025, 16);
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+  [-1, 1].forEach(side => {
+    const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+    wheel.rotation.z = Math.PI / 2;
+    wheel.position.set(0, 0, side * 0.14);
+    wheel.castShadow = true;
+    simRobotGroup.add(wheel);
+  });
+
+  // Caster ball
+  const caster = new THREE.Mesh(
+    new THREE.SphereGeometry(0.015, 8, 8),
+    new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.3, metalness: 0.7 })
+  );
+  caster.position.set(-0.11, -0.015, 0);
+  simRobotGroup.add(caster);
+
+  // Direction arrow
+  const arrowShape = new THREE.Shape();
+  arrowShape.moveTo(0, 0.06);
+  arrowShape.lineTo(-0.03, -0.02);
+  arrowShape.lineTo(0.03, -0.02);
+  arrowShape.closePath();
+  const arrowGeo = new THREE.ShapeGeometry(arrowShape);
+  const arrowMat = new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x00ff88, emissiveIntensity: 0.4 });
+  const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+  arrow.rotation.x = -Math.PI / 2;
+  arrow.position.y = 0.068;
+  simRobotGroup.add(arrow);
+
+  simRobotGroup.position.y = SIM_ROBOT_HEIGHT;
+  simScene.add(simRobotGroup);
+  document.getElementById('sim-urdf-name').textContent = '✓ TurtleBot3 (built-in)';
+  toast('Loaded TurtleBot3 model');
+}
+
+function simBuildPlaceholderRobot(group) {
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.25, 0.1, 0.2),
+    new THREE.MeshStandardMaterial({ color: 0x3b9eff, roughness: 0.4 })
+  );
+  body.position.y = 0.05;
+  body.castShadow = true;
+  group.add(body);
+
+  // Direction indicator
+  const arrow = new THREE.Mesh(
+    new THREE.ConeGeometry(0.04, 0.08, 8),
+    new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x00ff88, emissiveIntensity: 0.3 })
+  );
+  arrow.rotation.z = -Math.PI / 2;
+  arrow.position.set(0.16, 0.05, 0);
+  group.add(arrow);
+}
+
+// ── Scene toggles ─────────────────────────────────────────────
+let simGridOn = true, simAxesOn = true, simMapOn = false;
+
+function simToggleGrid() {
+  simGridOn = !simGridOn;
+  if (simGridHelper) simGridHelper.visible = simGridOn;
+  document.getElementById('sim-grid-btn').textContent = 'Grid: ' + (simGridOn ? 'ON' : 'OFF');
+}
+
+function simToggleAxes() {
+  simAxesOn = !simAxesOn;
+  if (simAxesHelper) simAxesHelper.visible = simAxesOn;
+  document.getElementById('sim-axes-btn').textContent = 'Axes: ' + (simAxesOn ? 'ON' : 'OFF');
+}
+
+function simSetBg(hex) {
+  if (simScene) {
+    simScene.background = new THREE.Color(hex);
+    simScene.fog.color = new THREE.Color(hex);
+  }
+}
+
+function simResetCamera() {
+  simFollowing = false;
+  simCamera.position.set(3, 3, 3);
+  simControls.target.set(0, 0, 0);
+}
+
+function simTopView() {
+  simFollowing = false;
+  const tx = robotX || 0, ty = robotY || 0;
+  simCamera.position.set(tx, 8, -ty);
+  simControls.target.set(tx, 0, -ty);
+}
+
+function simFollowRobot() {
+  simFollowing = !simFollowing;
+  document.getElementById('sim-mode-txt').textContent = simFollowing ? 'Follow' : 'Orbit';
+}
+
+// ── Occupancy map as 3D floor texture ─────────────────────────
+function simToggleMap() {
+  simMapOn = !simMapOn;
+  document.getElementById('sim-map-btn').textContent = 'Map: ' + (simMapOn ? 'ON' : 'OFF');
+
+  if (simMapOn) {
+    simBuildMap();
+  } else if (simMapMesh) {
+    simScene.remove(simMapMesh);
+    simMapMesh = null;
+  }
+}
+
+function simBuildMap() {
+  if (simMapMesh) { simScene.remove(simMapMesh); simMapMesh = null; }
+  if (!occupancyData || !mapWidth || !mapHeight) {
+    toast('No map data — load a map in AMR tab first', 'err');
+    simMapOn = false;
+    document.getElementById('sim-map-btn').textContent = 'Map: OFF';
+    return;
+  }
+
+  // Create texture from occupancy data
+  const w = mapWidth, h = mapHeight;
+  const imgData = new Uint8Array(w * h * 4);
+  for (let i = 0; i < w * h; i++) {
+    const v = occupancyData[i];
+    let r, g, b, a;
+    if (v === -1 || v === 255) {
+      r = 26; g = 37; b = 53; a = 180;   // unknown — dark blue-gray
+    } else if (v > 50) {
+      r = 40; g = 40; b = 50; a = 255;   // occupied — dark
+    } else {
+      r = 200; g = 210; b = 220; a = 200; // free — light
+    }
+    // Flip Y for Three.js texture
+    const row = h - 1 - Math.floor(i / w);
+    const col = i % w;
+    const idx = (row * w + col) * 4;
+    imgData[idx] = r; imgData[idx+1] = g; imgData[idx+2] = b; imgData[idx+3] = a;
+  }
+
+  const texture = new THREE.DataTexture(imgData, w, h, THREE.RGBAFormat);
+  texture.needsUpdate = true;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.NearestFilter;
+
+  const worldW = w * mapResolution;
+  const worldH = h * mapResolution;
+  const geo = new THREE.PlaneGeometry(worldW, worldH);
+  const mat = new THREE.MeshStandardMaterial({ map: texture, transparent: true, roughness: 0.95, side: THREE.DoubleSide });
+  simMapMesh = new THREE.Mesh(geo, mat);
+  simMapMesh.rotation.x = -Math.PI / 2;
+  simMapMesh.position.set(
+    mapOriginX + worldW / 2,
+    0.002,
+    -(mapOriginY + worldH / 2)
+  );
+  simScene.add(simMapMesh);
+}
+
+// ── 3D LiDAR point cloud ──────────────────────────────────────
+function simUpdateLidar() {
+  // Remove previous
+  if (simLidarPoints) { simScene.remove(simLidarPoints); simLidarPoints = null; }
+  if (!lidarPoints || !lidarPoints.length) return;
+
+  const count = lidarPoints.length;
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+
+  for (let i = 0; i < count; i++) {
+    const p = lidarPoints[i];
+    positions[i * 3]     = p.x;
+    positions[i * 3 + 1] = 0.08;   // slightly above ground
+    positions[i * 3 + 2] = -p.y;   // ROS Y → Three.js -Z
+
+    // Color: close points warm, far points cool
+    const dist = robotX !== null
+      ? Math.sqrt((p.x - robotX) ** 2 + (p.y - robotY) ** 2)
+      : 1;
+    const t = Math.min(dist / 4, 1);
+    colors[i * 3]     = 1 - t * 0.7;       // R
+    colors[i * 3 + 1] = 0.2 + t * 0.6;     // G
+    colors[i * 3 + 2] = 0.2 + t * 0.8;     // B
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 0.04,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.85,
+    sizeAttenuation: true,
+  });
+
+  simLidarPoints = new THREE.Points(geo, mat);
+  simScene.add(simLidarPoints);
+}
+
+// ── 3D navigation path ────────────────────────────────────────
+function simUpdatePath() {
+  if (simPathLine) { simScene.remove(simPathLine); simPathLine = null; }
+  if (!globalPath || globalPath.length < 2) return;
+
+  const points = globalPath.map(p => new THREE.Vector3(p.x, 0.05, -p.y));
+  const geo = new THREE.BufferGeometry().setFromPoints(points);
+  const mat = new THREE.LineBasicMaterial({ color: 0x00e0ff, linewidth: 2, transparent: true, opacity: 0.7 });
+  simPathLine = new THREE.Line(geo, mat);
+  simScene.add(simPathLine);
+}
+
+// ── 3D waypoint markers ───────────────────────────────────────
+function simUpdateWaypoints() {
+  // Remove old markers
+  simWaypointMarkers.forEach(m => simScene.remove(m));
+  simWaypointMarkers = [];
+  if (!missionWaypoints || !missionWaypoints.length) return;
+
+  missionWaypoints.forEach((wp, i) => {
+    const geo = new THREE.SphereGeometry(0.06, 12, 12);
+    const isActive = missionActive && i === missionIndex;
+    const isPast = missionActive && i < missionIndex;
+    const color = isActive ? 0x00ff88 : isPast ? 0x555555 : 0xf39c12;
+    const mat = new THREE.MeshStandardMaterial({
+      color,
+      emissive: isActive ? 0x00ff88 : color,
+      emissiveIntensity: isActive ? 0.6 : 0.2,
+    });
+    const marker = new THREE.Mesh(geo, mat);
+    marker.position.set(wp.x, 0.12, -wp.y);
+    marker.castShadow = true;
+    simScene.add(marker);
+    simWaypointMarkers.push(marker);
+
+    // Vertical line from marker to ground
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(wp.x, 0, -wp.y),
+      new THREE.Vector3(wp.x, 0.12, -wp.y),
+    ]);
+    const lineMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.4 });
+    const line = new THREE.Line(lineGeo, lineMat);
+    simScene.add(line);
+    simWaypointMarkers.push(line);
+  });
+}
+
+function simToggleLidar() {
+  simLidarOn = !simLidarOn;
+  document.getElementById('sim-lidar-btn').textContent = 'LiDAR: ' + (simLidarOn ? 'ON' : 'OFF');
+  if (!simLidarOn && simLidarPoints) { simScene.remove(simLidarPoints); simLidarPoints = null; }
+}
+
+function simTogglePath() {
+  simPathOn = !simPathOn;
+  document.getElementById('sim-path-btn').textContent = 'Path: ' + (simPathOn ? 'ON' : 'OFF');
+  if (!simPathOn && simPathLine) { simScene.remove(simPathLine); simPathLine = null; }
+}
+
+function simToggleWaypoints() {
+  simWaypointsOn = !simWaypointsOn;
+  document.getElementById('sim-wp-btn').textContent = 'Waypts: ' + (simWaypointsOn ? 'ON' : 'OFF');
+  if (!simWaypointsOn) { simWaypointMarkers.forEach(m => simScene.remove(m)); simWaypointMarkers = []; }
+}
+
+// ── Click-to-set-goal ─────────────────────────────────────────
+function simToggleGoalMode() {
+  simGoalMode = !simGoalMode;
+  const btn = document.getElementById('sim-goal-btn');
+  const crosshair = document.getElementById('sim-crosshair');
+  if (simGoalMode) {
+    btn.textContent = '✕ Cancel Goal Mode';
+    btn.className = 'sim-btn sim-btn-danger';
+    crosshair.style.display = 'block';
+    document.getElementById('sim-mode-txt').textContent = 'Set Goal';
+    simRenderer.domElement.style.cursor = 'crosshair';
+  } else {
+    btn.textContent = '🎯 Click to Set Goal';
+    btn.className = 'sim-btn sim-btn-green';
+    crosshair.style.display = 'none';
+    document.getElementById('sim-mode-txt').textContent = simFollowing ? 'Follow' : 'Orbit';
+    simRenderer.domElement.style.cursor = 'default';
+  }
+}
+
+function simOnClick(e) {
+  if (!simGoalMode) return;
+
+  const rect = simRenderer.domElement.getBoundingClientRect();
+  simMouse.x =  ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  simMouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+  simRaycaster.setFromCamera(simMouse, simCamera);
+  const ground = simScene.getObjectByName('ground');
+  if (!ground) return;
+  const hits = simRaycaster.intersectObject(ground);
+  if (hits.length === 0) return;
+
+  const pt = hits[0].point;
+  const worldX = pt.x;
+  const worldY = -pt.z;   // Three.js Z → ROS Y
+
+  // Place goal marker
+  simGoalMarker.position.set(pt.x, 0.15, pt.z);
+  simGoalMarker.visible = true;
+
+  // Send nav goal (default yaw toward robot or 0)
+  let yaw = 0;
+  if (robotX !== null) {
+    yaw = Math.atan2(worldY - robotY, worldX - robotX);
+  }
+
+  if (typeof sendNavGoal === 'function' && rosConnected) {
+    sendNavGoal(worldX, worldY, yaw);
+    toast('Goal sent: (' + worldX.toFixed(2) + ', ' + worldY.toFixed(2) + ')');
+  } else {
+    toast('Connect to robot in AMR tab to send goals', 'err');
+  }
+
+  simToggleGoalMode(); // exit goal mode
+}
+
+function simOnMouseMove(e) {
+  const rect = simRenderer.domElement.getBoundingClientRect();
+  const mx =  ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  simRaycaster.setFromCamera(new THREE.Vector2(mx, my), simCamera);
+  const ground = simScene.getObjectByName('ground');
+  if (!ground) return;
+  const hits = simRaycaster.intersectObject(ground);
+  if (hits.length > 0) {
+    const p = hits[0].point;
+    document.getElementById('sim-cursor-hud').textContent =
+      'World: ' + p.x.toFixed(2) + ' , ' + (-p.z).toFixed(2);
+  }
+}
+
+// ── Multi-robot fleet visualization ───────────────────────────
+function simUpdateFleetList() {
+  const list = document.getElementById('sim-robot-list');
+  if (!_robots || !_robots.length) {
+    list.innerHTML = '<div style="color:var(--muted);font-family:var(--mono);font-size:10px;padding:8px;text-align:center">Connect to robots in AMR tab first</div>';
+    return;
+  }
+  list.innerHTML = _robots.map(r => {
+    const conn = rosConnections[r.robot_code];
+    const on = conn?.connected;
+    return `<div class="sim-robot-item">
+      <div class="sim-robot-dot" style="background:${on ? 'var(--green)' : 'var(--muted)'}"></div>
+      <span style="flex:1;color:${on ? 'var(--text)' : 'var(--muted)'}">${esc(r.robot_code)}</span>
+      <span style="font-size:9px;color:var(--muted)">${on ? 'Online' : 'Offline'}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Tab activation hook ───────────────────────────────────────
+// Initialize simulation on first tab visit
+const simTabBtn = document.querySelector('[data-tab="sim"]');
+if (simTabBtn) {
+  simTabBtn.addEventListener('click', () => {
+    ensureSimLibs(() => {
+      simInit();
+      simUpdateFleetList();
+      // Rebuild map if available
+      if (simMapOn && occupancyData) simBuildMap();
+    });
+  });
 }
 
 /* ════════════════════════════════════════════════════════════

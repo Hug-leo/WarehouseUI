@@ -75,8 +75,24 @@ def init_db():
            CREATE TABLE Robots (
                id INT IDENTITY(1,1) PRIMARY KEY,
                robot_code NVARCHAR(50) NOT NULL,
-               description NVARCHAR(100)
+               description NVARCHAR(100),
+               status NVARCHAR(20) DEFAULT 'IDLE',
+               ip_address NVARCHAR(50),
+               home_x FLOAT DEFAULT -1.29553,
+               home_y FLOAT DEFAULT -0.0492027,
+               home_yaw FLOAT DEFAULT 0.1848
            )""",
+        # Migrate existing Robots table — add new columns if missing
+        """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Robots' AND COLUMN_NAME='status')
+           ALTER TABLE Robots ADD status NVARCHAR(20) DEFAULT 'IDLE'""",
+        """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Robots' AND COLUMN_NAME='ip_address')
+           ALTER TABLE Robots ADD ip_address NVARCHAR(50)""",
+        """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Robots' AND COLUMN_NAME='home_x')
+           ALTER TABLE Robots ADD home_x FLOAT DEFAULT -1.29553""",
+        """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Robots' AND COLUMN_NAME='home_y')
+           ALTER TABLE Robots ADD home_y FLOAT DEFAULT -0.0492027""",
+        """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Robots' AND COLUMN_NAME='home_yaw')
+           ALTER TABLE Robots ADD home_yaw FLOAT DEFAULT 0.1848""",
         """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='Locations')
            CREATE TABLE Locations (
                id INT IDENTITY(1,1) PRIMARY KEY,
@@ -167,6 +183,22 @@ SHELF_COORDS = {
     "RACK_D_03": {"x": -0.534, "y": 0.278, "yaw": 3.14159},
 }
 HOME_COORD = {"x": -1.29553, "y": -0.0492027, "yaw": 0.1848}
+
+
+def get_robot_home(robot_code: str) -> dict:
+    """Look up a robot's home position by robot_code. Returns HOME_COORD as fallback."""
+    if not robot_code:
+        return HOME_COORD
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT home_x, home_y, home_yaw FROM Robots WHERE robot_code=?",
+            robot_code,
+        )
+        row = cur.fetchone()
+        if row and row[0] is not None:
+            return {"x": row[0], "y": row[1], "yaw": row[2]}
+    return HOME_COORD
 
 
 def plan_pick_route(
@@ -363,11 +395,21 @@ class ScanRequest(BaseModel):
 class RobotCreate(BaseModel):
     robot_code: str
     description: Optional[str] = None
+    status: Optional[str] = "IDLE"
+    ip_address: Optional[str] = None
+    home_x: Optional[float] = None
+    home_y: Optional[float] = None
+    home_yaw: Optional[float] = None
 
 
 class RobotUpdate(BaseModel):
     robot_code: Optional[str] = None
     description: Optional[str] = None
+    status: Optional[str] = None
+    ip_address: Optional[str] = None
+    home_x: Optional[float] = None
+    home_y: Optional[float] = None
+    home_yaw: Optional[float] = None
 
 
 class LocationCreate(BaseModel):
@@ -472,10 +514,18 @@ def get_robots():
 def create_robot(b: RobotCreate):
     with get_connection() as conn:
         cur = conn.cursor()
+        hx = b.home_x if b.home_x is not None else HOME_COORD["x"]
+        hy = b.home_y if b.home_y is not None else HOME_COORD["y"]
+        hyaw = b.home_yaw if b.home_yaw is not None else HOME_COORD["yaw"]
         cur.execute(
-            "INSERT INTO Robots (robot_code, description) VALUES (?,?)",
+            "INSERT INTO Robots (robot_code, description, status, ip_address, home_x, home_y, home_yaw) VALUES (?,?,?,?,?,?,?)",
             b.robot_code,
             b.description,
+            b.status or "IDLE",
+            b.ip_address,
+            hx,
+            hy,
+            hyaw,
         )
         conn.commit()
     return {"status": "created"}
@@ -490,6 +540,21 @@ def update_robot(rid: int, b: RobotUpdate):
     if b.description is not None:
         f.append("description=?")
         v.append(b.description)
+    if b.status is not None:
+        f.append("status=?")
+        v.append(b.status)
+    if b.ip_address is not None:
+        f.append("ip_address=?")
+        v.append(b.ip_address)
+    if b.home_x is not None:
+        f.append("home_x=?")
+        v.append(b.home_x)
+    if b.home_y is not None:
+        f.append("home_y=?")
+        v.append(b.home_y)
+    if b.home_yaw is not None:
+        f.append("home_yaw=?")
+        v.append(b.home_yaw)
     if not f:
         raise HTTPException(400, "No fields")
     v.append(rid)
@@ -844,12 +909,26 @@ async def create_order(b: OrderCreate):
     with get_connection() as conn:
         cur = conn.cursor()
 
+        # Resolve robot: use specified or auto-assign first IDLE robot
+        robot_code = b.assigned_robot
+        if robot_code:
+            cur.execute("SELECT robot_code FROM Robots WHERE robot_code=?", robot_code)
+            if not cur.fetchone():
+                raise HTTPException(400, f"Robot '{robot_code}' not found")
+        else:
+            cur.execute(
+                "SELECT TOP 1 robot_code FROM Robots WHERE status='IDLE' ORDER BY id"
+            )
+            row = cur.fetchone()
+            if row:
+                robot_code = row[0]
+
         # 1. Create order
         cur.execute(
             "INSERT INTO Orders (order_code, status, assigned_robot) OUTPUT INSERTED.id VALUES (?,?,?)",
             b.order_code,
             "PENDING",
-            b.assigned_robot,
+            robot_code,
         )
         order_id = int(cur.fetchone()[0])
 
@@ -910,9 +989,10 @@ async def create_order(b: OrderCreate):
                 }
             )
 
-        # 3. TSP route planning
+        # 3. TSP route planning — start from assigned robot's home position
         routable = [i for i in items_for_routing if i["location_code"]]
-        route = plan_pick_route(routable)
+        robot_home = get_robot_home(robot_code)
+        route = plan_pick_route(routable, robot_home["x"], robot_home["y"])
 
         # 4. Insert PickTasks
         for seq, item in enumerate(route, start=1):
@@ -945,15 +1025,33 @@ async def create_order(b: OrderCreate):
 
 @app.post("/orders/{oid}/dispatch", tags=["Orders"])
 async def dispatch_order(oid: int):
-    """Mark order as IN_PROGRESS and return the pick route for the robot."""
+    """Mark order as IN_PROGRESS, assign robot as BUSY, return the pick route."""
     with get_connection() as conn:
         cur = conn.cursor()
+
+        # Check order is PENDING
         cur.execute(
-            "UPDATE Orders SET status='IN_PROGRESS' WHERE id=? AND status='PENDING'",
-            oid,
+            "SELECT assigned_robot FROM Orders WHERE id=? AND status='PENDING'", oid
         )
-        if cur.rowcount == 0:
+        row = cur.fetchone()
+        if not row:
             raise HTTPException(400, "Order not dispatchable (not PENDING)")
+        robot_code = row[0]
+
+        # Validate assigned robot is IDLE
+        if robot_code:
+            cur.execute("SELECT status FROM Robots WHERE robot_code=?", robot_code)
+            r = cur.fetchone()
+            if r and r[0] != "IDLE":
+                raise HTTPException(
+                    409, f"Robot '{robot_code}' is currently {r[0]}, cannot dispatch"
+                )
+            # Mark robot BUSY
+            cur.execute(
+                "UPDATE Robots SET status='BUSY' WHERE robot_code=?", robot_code
+            )
+
+        cur.execute("UPDATE Orders SET status='IN_PROGRESS' WHERE id=?", oid)
         conn.commit()
 
     detail = get_order_detail(oid)
@@ -1081,26 +1179,32 @@ async def pick_complete(pt_id: int):
             pick_qty,
         )
 
-        # Check: all items in this order picked?
+        # Check: all items in this order picked? (atomic check-and-update)
         cur.execute(
             """
-            SELECT COUNT(*) FROM PickTasks WHERE order_id=? AND status != 'PICKED'
+            UPDATE Orders SET status='COMPLETED', completed_at=GETDATE()
+            WHERE id=? AND NOT EXISTS (
+                SELECT 1 FROM PickTasks WHERE order_id=? AND status != 'PICKED'
+            )
         """,
             order_id,
+            order_id,
         )
-        remaining = cur.fetchone()[0]
-        if remaining == 0:
-            cur.execute(
-                "UPDATE Orders SET status='COMPLETED', completed_at=GETDATE() WHERE id=?",
-                order_id,
-            )
+        remaining_check = cur.rowcount  # 1 if order completed, 0 if tasks remain
+        if remaining_check > 0:
+            # Release robot back to IDLE
+            cur.execute("SELECT assigned_robot FROM Orders WHERE id=?", order_id)
+            ar = cur.fetchone()
+            if ar and ar[0]:
+                cur.execute("UPDATE Robots SET status='IDLE' WHERE robot_code=?", ar[0])
 
         conn.commit()
 
     detail = get_order_detail(order_id)
-    msg_type = "order_completed" if remaining == 0 else "pick_completed"
+    order_complete = remaining_check > 0
+    msg_type = "order_completed" if order_complete else "pick_completed"
     await manager.broadcast({"type": msg_type, "data": detail, "pick_task_id": pt_id})
-    return {"status": "picked", "order_complete": remaining == 0}
+    return {"status": "picked", "order_complete": order_complete}
 
 
 @app.delete("/orders/{oid}", tags=["Orders"])
@@ -1133,7 +1237,7 @@ def health():
 @app.post("/seed-demo", tags=["Utility"])
 def seed_demo():
     """
-    Populate Locations, Products, Inventory with virtual warehouse data.
+    Populate Robots, Locations, Products, Inventory with virtual warehouse data.
     Safe to call multiple times — skips if Locations already seeded.
     """
     with get_connection() as conn:
@@ -1141,6 +1245,48 @@ def seed_demo():
         cur.execute("SELECT COUNT(*) FROM Locations")
         if cur.fetchone()[0] > 0:
             return {"status": "already_seeded"}
+
+        # Robots — one real + two planned for future expansion
+        robots = [
+            (
+                "AMR_01",
+                "TurtleBot3 — main floor robot",
+                "IDLE",
+                "192.168.1.56",
+                HOME_COORD["x"],
+                HOME_COORD["y"],
+                HOME_COORD["yaw"],
+            ),
+            (
+                "AMR_02",
+                "TurtleBot3 — zone B backup",
+                "OFFLINE",
+                "192.168.1.57",
+                0.997,
+                -0.417,
+                0.0,
+            ),
+            (
+                "AMR_03",
+                "TurtleBot3 — maintenance/testing",
+                "OFFLINE",
+                "192.168.1.58",
+                1.010,
+                0.557,
+                1.57,
+            ),
+        ]
+        for rc, desc, st, ip, hx, hy, hyaw in robots:
+            cur.execute(
+                "INSERT INTO Robots (robot_code, description, status, ip_address, home_x, home_y, home_yaw) VALUES (?,?,?,?,?,?,?)",
+                rc,
+                desc,
+                st,
+                ip,
+                hx,
+                hy,
+                hyaw,
+            )
 
         # 12 shelf locations matching SHELF_COORDS
         locations = [
@@ -1199,7 +1345,13 @@ def seed_demo():
             )
 
         conn.commit()
-    return {"status": "seeded", "locations": 12, "products": 12, "inventory": 12}
+    return {
+        "status": "seeded",
+        "robots": 3,
+        "locations": 12,
+        "products": 12,
+        "inventory": 12,
+    }
 
 
 @app.get("/", include_in_schema=False)
