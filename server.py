@@ -33,7 +33,8 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
+import math
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ← EDIT: your SQL Server name
@@ -104,6 +105,40 @@ def init_db():
                qr_code NVARCHAR(50),
                scan_time DATETIME DEFAULT GETDATE()
            )""",
+        """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='Orders')
+           CREATE TABLE Orders (
+               id INT IDENTITY(1,1) PRIMARY KEY,
+               order_code NVARCHAR(50) NOT NULL,
+               status NVARCHAR(20) DEFAULT 'PENDING',
+               assigned_robot NVARCHAR(50),
+               created_at DATETIME DEFAULT GETDATE(),
+               completed_at DATETIME
+           )""",
+        """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='OrderItems')
+           CREATE TABLE OrderItems (
+               id INT IDENTITY(1,1) PRIMARY KEY,
+               order_id INT NOT NULL,
+               product_id INT NOT NULL,
+               quantity INT NOT NULL,
+               picked_qty INT DEFAULT 0,
+               status NVARCHAR(20) DEFAULT 'PENDING'
+           )""",
+        """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='PickTasks')
+           CREATE TABLE PickTasks (
+               id INT IDENTITY(1,1) PRIMARY KEY,
+               order_id INT NOT NULL,
+               order_item_id INT NOT NULL,
+               location_id INT NOT NULL,
+               product_id INT NOT NULL,
+               quantity INT NOT NULL,
+               seq INT NOT NULL,
+               status NVARCHAR(20) DEFAULT 'PENDING',
+               nav_x FLOAT,
+               nav_y FLOAT,
+               nav_yaw FLOAT,
+               scanned_at DATETIME,
+               picked_at DATETIME
+           )""",
     ]
     with get_connection() as conn:
         cur = conn.cursor()
@@ -111,6 +146,57 @@ def init_db():
             cur.execute(s)
         conn.commit()
     print("[DB] Tables verified.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shelf coordinate map — matches dashboard PRESETS & physical rack positions
+# key = location_code, value = {x, y, yaw} in the ROS map frame
+# ─────────────────────────────────────────────────────────────────────────────
+SHELF_COORDS = {
+    "RACK_A_01": {"x": -0.546, "y": -0.512, "yaw": -1.57},
+    "RACK_A_02": {"x": -0.546, "y": -0.512, "yaw": -1.57},
+    "RACK_A_03": {"x": -0.546, "y": -0.512, "yaw": -1.57},
+    "RACK_B_01": {"x": 0.997, "y": -0.417, "yaw": 0.0},
+    "RACK_B_02": {"x": 0.997, "y": -0.417, "yaw": 0.0},
+    "RACK_B_03": {"x": 0.997, "y": -0.417, "yaw": 0.0},
+    "RACK_C_01": {"x": 1.010, "y": 0.557, "yaw": 1.57},
+    "RACK_C_02": {"x": 1.010, "y": 0.557, "yaw": 1.57},
+    "RACK_C_03": {"x": 1.010, "y": 0.557, "yaw": 1.57},
+    "RACK_D_01": {"x": -0.534, "y": 0.278, "yaw": 3.14159},
+    "RACK_D_02": {"x": -0.534, "y": 0.278, "yaw": 3.14159},
+    "RACK_D_03": {"x": -0.534, "y": 0.278, "yaw": 3.14159},
+}
+HOME_COORD = {"x": -1.29553, "y": -0.0492027, "yaw": 0.1848}
+
+
+def plan_pick_route(
+    items_with_locations: list, robot_x: float = None, robot_y: float = None
+) -> list:
+    """
+    Nearest-neighbor TSP: given a list of (order_item_id, product_id, qty, location_id, location_code),
+    return them sorted by shortest travel path from current robot position.
+    """
+    if robot_x is None:
+        robot_x, robot_y = HOME_COORD["x"], HOME_COORD["y"]
+
+    remaining = list(items_with_locations)
+    route = []
+    cx, cy = robot_x, robot_y
+
+    while remaining:
+        best_idx, best_dist = 0, float("inf")
+        for i, item in enumerate(remaining):
+            coord = SHELF_COORDS.get(item["location_code"], HOME_COORD)
+            d = math.sqrt((coord["x"] - cx) ** 2 + (coord["y"] - cy) ** 2)
+            if d < best_dist:
+                best_dist = d
+                best_idx = i
+        chosen = remaining.pop(best_idx)
+        coord = SHELF_COORDS.get(chosen["location_code"], HOME_COORD)
+        cx, cy = coord["x"], coord["y"]
+        route.append(chosen)
+
+    return route
 
 
 def fetch_enriched_scan(scan_id: int) -> dict:
@@ -325,6 +411,17 @@ class ScanCreate(BaseModel):
     qr_code: str
 
 
+class OrderCreate(BaseModel):
+    order_code: str
+    assigned_robot: Optional[str] = "AMR_01"
+    items: List[dict]  # [{"product_id": 1, "quantity": 2}, ...]
+
+
+class PickConfirm(BaseModel):
+    qr_code: str
+    robot_code: str
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SCAN  ← main robot endpoint — saves + broadcasts
 # ─────────────────────────────────────────────────────────────────────────────
@@ -342,11 +439,10 @@ async def post_scan(b: ScanRequest):
     with get_connection() as conn:
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO ScanLogs (robot_code, qr_code, scan_time) VALUES (?,?,GETDATE())",
+            "INSERT INTO ScanLogs (robot_code, qr_code, scan_time) OUTPUT INSERTED.id VALUES (?,?,GETDATE())",
             b.robot_code,
             b.qr_code,
         )
-        cur.execute("SELECT SCOPE_IDENTITY()")
         new_id = int(cur.fetchone()[0])
         conn.commit()
 
@@ -637,11 +733,10 @@ async def create_scanlog(b: ScanCreate):
     with get_connection() as conn:
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO ScanLogs (robot_code, qr_code, scan_time) VALUES (?,?,GETDATE())",
+            "INSERT INTO ScanLogs (robot_code, qr_code, scan_time) OUTPUT INSERTED.id VALUES (?,?,GETDATE())",
             b.robot_code,
             b.qr_code,
         )
-        cur.execute("SELECT SCOPE_IDENTITY()")
         new_id = int(cur.fetchone()[0])
         conn.commit()
     enriched = fetch_enriched_scan(new_id)
@@ -661,6 +756,367 @@ def delete_scanlog(lid: int):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ORDERS + PICK TASKS
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@app.get("/orders", tags=["Orders"])
+def get_orders():
+    sql = """
+        SELECT o.id, o.order_code, o.status, o.assigned_robot,
+               CONVERT(NVARCHAR, o.created_at, 120)   AS created_at,
+               CONVERT(NVARCHAR, o.completed_at, 120)  AS completed_at,
+               (SELECT COUNT(*) FROM OrderItems WHERE order_id=o.id) AS item_count,
+               (SELECT COUNT(*) FROM OrderItems WHERE order_id=o.id AND status='PICKED') AS picked_count
+        FROM Orders o ORDER BY o.id DESC
+    """
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute(sql)
+        return rows_to_list(cur, cur.fetchall())
+
+
+@app.get("/orders/{oid}", tags=["Orders"])
+def get_order_detail(oid: int):
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT o.id, o.order_code, o.status, o.assigned_robot,
+                   CONVERT(NVARCHAR, o.created_at, 120)  AS created_at,
+                   CONVERT(NVARCHAR, o.completed_at, 120) AS completed_at
+            FROM Orders o WHERE o.id=?
+        """,
+            oid,
+        )
+        order = cur.fetchone()
+        if not order:
+            raise HTTPException(404, "Order not found")
+        cols = [c[0] for c in cur.description]
+        order_dict = dict(zip(cols, order))
+
+        cur.execute(
+            """
+            SELECT oi.id, oi.product_id, oi.quantity, oi.picked_qty, oi.status,
+                   p.product_code, p.name AS product_name, p.category
+            FROM OrderItems oi
+            LEFT JOIN Products p ON oi.product_id = p.id
+            WHERE oi.order_id=? ORDER BY oi.id
+        """,
+            oid,
+        )
+        order_dict["items"] = rows_to_list(cur, cur.fetchall())
+
+        cur.execute(
+            """
+            SELECT pt.id, pt.order_item_id, pt.location_id, pt.product_id,
+                   pt.quantity, pt.seq, pt.status,
+                   pt.nav_x, pt.nav_y, pt.nav_yaw,
+                   l.location_code, l.rack, l.slot,
+                   p.product_code, p.name AS product_name,
+                   CONVERT(NVARCHAR, pt.scanned_at, 120) AS scanned_at,
+                   CONVERT(NVARCHAR, pt.picked_at, 120)  AS picked_at
+            FROM PickTasks pt
+            LEFT JOIN Locations l ON pt.location_id = l.id
+            LEFT JOIN Products  p ON pt.product_id  = p.id
+            WHERE pt.order_id=? ORDER BY pt.seq
+        """,
+            oid,
+        )
+        order_dict["pick_tasks"] = rows_to_list(cur, cur.fetchall())
+
+    return order_dict
+
+
+@app.post("/orders", tags=["Orders"], status_code=201)
+async def create_order(b: OrderCreate):
+    """
+    Create order + auto-generate optimized pick route.
+    1. Insert Order + OrderItems
+    2. For each item, find the best inventory location (highest stock)
+    3. Run nearest-neighbor TSP to sequence the picks
+    4. Insert PickTasks with nav coordinates
+    5. Broadcast to dashboard
+    """
+    if not b.items:
+        raise HTTPException(400, "Order must have at least one item")
+
+    with get_connection() as conn:
+        cur = conn.cursor()
+
+        # 1. Create order
+        cur.execute(
+            "INSERT INTO Orders (order_code, status, assigned_robot) OUTPUT INSERTED.id VALUES (?,?,?)",
+            b.order_code,
+            "PENDING",
+            b.assigned_robot,
+        )
+        order_id = int(cur.fetchone()[0])
+
+        # 2. Create order items & find inventory locations
+        items_for_routing = []
+        for item in b.items:
+            pid = item["product_id"]
+            qty = item["quantity"]
+
+            cur.execute(
+                "INSERT INTO OrderItems (order_id, product_id, quantity) OUTPUT INSERTED.id VALUES (?,?,?)",
+                order_id,
+                pid,
+                qty,
+            )
+            oi_id = int(cur.fetchone()[0])
+
+            # Find best location: has this product, sufficient stock, prefer highest qty
+            cur.execute(
+                """
+                SELECT TOP 1 i.location_id, i.quantity, l.location_code
+                FROM Inventory i
+                JOIN Locations l ON i.location_id = l.id
+                WHERE i.product_id = ? AND i.quantity >= ?
+                ORDER BY i.quantity DESC
+            """,
+                pid,
+                qty,
+            )
+            row = cur.fetchone()
+            if row:
+                loc_id, inv_qty, loc_code = row
+            else:
+                # Fallback: pick any location with this product
+                cur.execute(
+                    """
+                    SELECT TOP 1 i.location_id, i.quantity, l.location_code
+                    FROM Inventory i
+                    JOIN Locations l ON i.location_id = l.id
+                    WHERE i.product_id = ?
+                    ORDER BY i.quantity DESC
+                """,
+                    pid,
+                )
+                row = cur.fetchone()
+                if row:
+                    loc_id, inv_qty, loc_code = row
+                else:
+                    loc_id, loc_code = None, None
+
+            items_for_routing.append(
+                {
+                    "order_item_id": oi_id,
+                    "product_id": pid,
+                    "quantity": qty,
+                    "location_id": loc_id,
+                    "location_code": loc_code,
+                }
+            )
+
+        # 3. TSP route planning
+        routable = [i for i in items_for_routing if i["location_code"]]
+        route = plan_pick_route(routable)
+
+        # 4. Insert PickTasks
+        for seq, item in enumerate(route, start=1):
+            coord = SHELF_COORDS.get(item["location_code"], HOME_COORD)
+            cur.execute(
+                """
+                INSERT INTO PickTasks
+                    (order_id, order_item_id, location_id, product_id, quantity, seq, status, nav_x, nav_y, nav_yaw)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
+            """,
+                order_id,
+                item["order_item_id"],
+                item["location_id"],
+                item["product_id"],
+                item["quantity"],
+                seq,
+                "PENDING",
+                coord["x"],
+                coord["y"],
+                coord["yaw"],
+            )
+
+        conn.commit()
+
+    # 5. Broadcast
+    detail = get_order_detail(order_id)
+    await manager.broadcast({"type": "order_created", "data": detail})
+    return {"status": "created", "order_id": order_id}
+
+
+@app.post("/orders/{oid}/dispatch", tags=["Orders"])
+async def dispatch_order(oid: int):
+    """Mark order as IN_PROGRESS and return the pick route for the robot."""
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE Orders SET status='IN_PROGRESS' WHERE id=? AND status='PENDING'",
+            oid,
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(400, "Order not dispatchable (not PENDING)")
+        conn.commit()
+
+    detail = get_order_detail(oid)
+    await manager.broadcast({"type": "order_dispatched", "data": detail})
+    return detail
+
+
+@app.post("/pick/scan", tags=["Orders"])
+async def pick_scan_confirm(b: PickConfirm):
+    """
+    Robot scanned QR at a shelf during a pick mission.
+    1. Find the active PickTask for this location
+    2. Mark it SCANNED
+    3. Also log into ScanLogs
+    4. Broadcast update
+    """
+    with get_connection() as conn:
+        cur = conn.cursor()
+
+        # Find location by QR code
+        cur.execute("SELECT id FROM Locations WHERE location_code=?", b.qr_code)
+        loc_row = cur.fetchone()
+        if not loc_row:
+            raise HTTPException(404, f"Unknown location: {b.qr_code}")
+        loc_id = loc_row[0]
+
+        # Find the first PENDING pick task at this location for an IN_PROGRESS order
+        cur.execute(
+            """
+            SELECT pt.id, pt.order_id, pt.order_item_id, pt.product_id, pt.quantity
+            FROM PickTasks pt
+            JOIN Orders o ON pt.order_id = o.id
+            WHERE pt.location_id = ? AND pt.status = 'PENDING' AND o.status = 'IN_PROGRESS'
+            ORDER BY o.id, pt.seq
+        """,
+            loc_id,
+        )
+        task = cur.fetchone()
+        if not task:
+            # No pending task — just log the scan normally
+            cur.execute(
+                "INSERT INTO ScanLogs (robot_code, qr_code, scan_time) VALUES (?,?,GETDATE())",
+                b.robot_code,
+                b.qr_code,
+            )
+            conn.commit()
+            await manager.broadcast({"type": "pick_no_task", "qr_code": b.qr_code})
+            return {
+                "status": "logged",
+                "message": "No pending pick task at this location",
+            }
+
+        pt_id, order_id, oi_id, product_id, pick_qty = task
+
+        # Mark task as SCANNED
+        cur.execute(
+            "UPDATE PickTasks SET status='SCANNED', scanned_at=GETDATE() WHERE id=?",
+            pt_id,
+        )
+
+        # Log scan
+        cur.execute(
+            "INSERT INTO ScanLogs (robot_code, qr_code, scan_time) VALUES (?,?,GETDATE())",
+            b.robot_code,
+            b.qr_code,
+        )
+        conn.commit()
+
+    await manager.broadcast(
+        {
+            "type": "pick_scanned",
+            "order_id": order_id,
+            "pick_task_id": pt_id,
+            "location": b.qr_code,
+        }
+    )
+    return {"status": "scanned", "pick_task_id": pt_id, "order_id": order_id}
+
+
+@app.post("/pick/{pt_id}/complete", tags=["Orders"])
+async def pick_complete(pt_id: int):
+    """
+    Picking mechanism finished — mark task PICKED, decrement inventory,
+    update order item, check if full order is complete.
+    """
+    with get_connection() as conn:
+        cur = conn.cursor()
+
+        cur.execute(
+            """
+            SELECT pt.order_id, pt.order_item_id, pt.location_id, pt.product_id, pt.quantity, pt.status
+            FROM PickTasks pt WHERE pt.id=?
+        """,
+            pt_id,
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Pick task not found")
+        order_id, oi_id, loc_id, product_id, pick_qty, status = row
+        if status not in ("SCANNED", "PENDING"):
+            raise HTTPException(400, f"Task already {status}")
+
+        # Mark PICKED
+        cur.execute(
+            "UPDATE PickTasks SET status='PICKED', picked_at=GETDATE() WHERE id=?",
+            pt_id,
+        )
+
+        # Update order item
+        cur.execute(
+            "UPDATE OrderItems SET picked_qty=picked_qty+?, status='PICKED' WHERE id=?",
+            pick_qty,
+            oi_id,
+        )
+
+        # Decrement inventory
+        cur.execute(
+            """
+            UPDATE Inventory SET quantity = quantity - ?
+            WHERE product_id = ? AND location_id = ? AND quantity >= ?
+        """,
+            pick_qty,
+            product_id,
+            loc_id,
+            pick_qty,
+        )
+
+        # Check: all items in this order picked?
+        cur.execute(
+            """
+            SELECT COUNT(*) FROM PickTasks WHERE order_id=? AND status != 'PICKED'
+        """,
+            order_id,
+        )
+        remaining = cur.fetchone()[0]
+        if remaining == 0:
+            cur.execute(
+                "UPDATE Orders SET status='COMPLETED', completed_at=GETDATE() WHERE id=?",
+                order_id,
+            )
+
+        conn.commit()
+
+    detail = get_order_detail(order_id)
+    msg_type = "order_completed" if remaining == 0 else "pick_completed"
+    await manager.broadcast({"type": msg_type, "data": detail, "pick_task_id": pt_id})
+    return {"status": "picked", "order_complete": remaining == 0}
+
+
+@app.delete("/orders/{oid}", tags=["Orders"])
+def delete_order(oid: int):
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM PickTasks WHERE order_id=?", oid)
+        cur.execute("DELETE FROM OrderItems WHERE order_id=?", oid)
+        cur.execute("DELETE FROM Orders WHERE id=?", oid)
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Not found")
+        conn.commit()
+    return {"status": "deleted"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Utility
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -672,6 +1128,78 @@ def health():
         "timestamp": datetime.utcnow().isoformat(),
         "ws_clients": len(manager.active),
     }
+
+
+@app.post("/seed-demo", tags=["Utility"])
+def seed_demo():
+    """
+    Populate Locations, Products, Inventory with virtual warehouse data.
+    Safe to call multiple times — skips if Locations already seeded.
+    """
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM Locations")
+        if cur.fetchone()[0] > 0:
+            return {"status": "already_seeded"}
+
+        # 12 shelf locations matching SHELF_COORDS
+        locations = [
+            ("RACK_A_01", "A", "01"),
+            ("RACK_A_02", "A", "02"),
+            ("RACK_A_03", "A", "03"),
+            ("RACK_B_01", "B", "01"),
+            ("RACK_B_02", "B", "02"),
+            ("RACK_B_03", "B", "03"),
+            ("RACK_C_01", "C", "01"),
+            ("RACK_C_02", "C", "02"),
+            ("RACK_C_03", "C", "03"),
+            ("RACK_D_01", "D", "01"),
+            ("RACK_D_02", "D", "02"),
+            ("RACK_D_03", "D", "03"),
+        ]
+        for lc, rack, slot in locations:
+            cur.execute(
+                "INSERT INTO Locations (location_code, rack, slot) VALUES (?,?,?)",
+                lc,
+                rack,
+                slot,
+            )
+
+        # 12 products
+        products = [
+            ("PRD-001", "Widget A", "Widget"),
+            ("PRD-002", "Widget B", "Widget"),
+            ("PRD-003", "Gizmo Alpha", "Gizmo"),
+            ("PRD-004", "Gizmo Beta", "Gizmo"),
+            ("PRD-005", "Sensor Unit X", "Sensor"),
+            ("PRD-006", "Sensor Unit Y", "Sensor"),
+            ("PRD-007", "Motor DC-12V", "Actuator"),
+            ("PRD-008", "Motor Stepper", "Actuator"),
+            ("PRD-009", "Battery LiPo", "Power"),
+            ("PRD-010", "Battery NiMH", "Power"),
+            ("PRD-011", "PCB Main", "Electronics"),
+            ("PRD-012", "PCB Sensor", "Electronics"),
+        ]
+        for pc, name, cat in products:
+            cur.execute(
+                "INSERT INTO Products (product_code, name, category) VALUES (?,?,?)",
+                pc,
+                name,
+                cat,
+            )
+
+        # Inventory — one product per location, random-ish stock
+        stocks = [25, 40, 15, 30, 50, 20, 10, 35, 45, 18, 22, 38]
+        for idx in range(12):
+            cur.execute(
+                "INSERT INTO Inventory (product_id, location_id, quantity) VALUES (?,?,?)",
+                idx + 1,
+                idx + 1,
+                stocks[idx],
+            )
+
+        conn.commit()
+    return {"status": "seeded", "locations": 12, "products": 12, "inventory": 12}
 
 
 @app.get("/", include_in_schema=False)

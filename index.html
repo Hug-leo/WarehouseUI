@@ -382,6 +382,42 @@ select option{background:var(--surface)}
   border-top:none;font-family:var(--mono);font-size:10px;flex-wrap:wrap;gap:8px;
 }
 /* ══════════════════════════════════════════════════════════════
+   ORDERS TAB — STYLES
+════════════════════════════════════════════════════════════════ */
+.order-status{
+  display:inline-block;padding:2px 8px;border-radius:3px;
+  font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.08em;
+}
+.order-status.PENDING{background:rgba(245,166,35,.15);color:var(--accent)}
+.order-status.IN_PROGRESS{background:rgba(59,158,255,.15);color:var(--blue)}
+.order-status.COMPLETED{background:rgba(46,204,113,.15);color:var(--green)}
+.order-status.CANCELLED{background:rgba(231,76,60,.15);color:var(--red)}
+.order-progress{
+  width:100px;height:6px;background:var(--border2);border-radius:3px;overflow:hidden;display:inline-block;
+  vertical-align:middle;margin-right:6px;
+}
+.order-progress-fill{height:100%;background:var(--green);border-radius:3px;transition:width .3s}
+.pick-task-row{display:flex;gap:12px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border)}
+.pick-task-row:last-child{border-bottom:none}
+.pick-task-seq{
+  width:24px;height:24px;border-radius:50%;background:var(--border2);
+  display:grid;place-items:center;font-family:var(--mono);font-size:11px;font-weight:700;flex-shrink:0;
+}
+.pick-task-seq.PICKED{background:rgba(46,204,113,.2);color:var(--green)}
+.pick-task-seq.SCANNED{background:rgba(59,158,255,.2);color:var(--blue)}
+.pick-task-info{flex:1;font-size:12px}
+.pick-task-status{font-family:var(--mono);font-size:10px}
+#order-create-items{max-height:220px;overflow-y:auto;margin:8px 0}
+.oc-item-row{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+.oc-item-row select,.oc-item-row input{
+  background:var(--bg);border:1px solid var(--border2);color:var(--text);
+  font-family:var(--mono);font-size:12px;padding:6px;outline:none;
+}
+.oc-item-row select{flex:2}
+.oc-item-row input{flex:1;width:60px;text-align:center}
+.oc-item-row button{background:none;border:none;color:var(--red);cursor:pointer;font-size:14px}
+
+/* ══════════════════════════════════════════════════════════════
    AMR CONTROL TAB — STYLES
 ════════════════════════════════════════════════════════════════ */
 #tab-amr { padding:0 }
@@ -692,6 +728,7 @@ select option{background:var(--surface)}
   <button class="tab-btn" data-tab="inventory">Inventory <span class="cnt" id="cnt-inventory">0</span></button>
   <button class="tab-btn" data-tab="scanlogs">Scan Logs <span class="cnt" id="cnt-scanlogs">0</span></button>
   <button class="tab-btn" data-tab="camera">📷 Robot Camera</button>
+  <button class="tab-btn" data-tab="orders">📦 Orders <span class="cnt" id="cnt-orders">0</span></button>
   <button class="tab-btn" data-tab="amr">🤖 AMR Control</button>
 </nav>
 
@@ -927,6 +964,41 @@ select option{background:var(--surface)}
       <span style="color:var(--muted)">MJPEG stream · auto-scales to window</span>
     </div>
 
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     ORDERS TAB
+════════════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-orders">
+  <div class="crud-panel">
+    <div class="panel-header">
+      <div class="panel-title">Pick Orders</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="seedDemo()">🌱 Seed Demo Data</button>
+        <button class="btn btn-primary btn-sm" onclick="openCreateOrder()">+ New Order</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Order Code</th><th>Robot</th><th>Status</th>
+          <th>Items</th><th>Progress</th><th>Created</th><th></th>
+        </tr></thead>
+        <tbody id="body-orders">
+          <tr class="state-row"><td colspan="8"><span class="spinner"></span>Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Order detail / pick task list  (shown when clicking an order) -->
+  <div id="order-detail-panel" style="display:none" class="crud-panel" style="margin-top:16px">
+    <div class="panel-header">
+      <div class="panel-title" id="order-detail-title">Order #—</div>
+      <button class="btn btn-ghost btn-sm" onclick="closeOrderDetail()">✕ Close</button>
+    </div>
+    <div id="order-detail-body"></div>
   </div>
 </div>
 
@@ -1255,6 +1327,11 @@ function connectWS() {
       updateSpotlight(msg.data, true);
       renderFeed(true);
       updateStats();
+    } else if (['order_created','order_dispatched','pick_scanned','pick_completed','order_completed'].includes(msg.type)) {
+      // Any order event → refresh orders table
+      loadOrders();
+      if (msg.type === 'pick_scanned')   toast('QR scanned at ' + (msg.location ?? ''), 'ok');
+      if (msg.type === 'order_completed') toast('Order completed!', 'ok');
     }
   };
 
@@ -1776,6 +1853,7 @@ let mapOriginX = 0, mapOriginY = 0; // map origin in canvas px
 let mapResolution = 0.05;          // metres per cell
 let mapWidth = 0, mapHeight = 0;   // cells
 let occupancyData = null;          // flat Uint8Array
+let occupancyCachedCanvas = null;  // pre-rendered grid (1 px/cell)
 let mapPanOffset  = { x: 0, y: 0 };
 let isPanning     = false;
 let panStart      = { x: 0, y: 0 };
@@ -1899,18 +1977,47 @@ function setupTopics() {
   });
 
   // ── /map — occupancy grid
-  const mapTopic = new ROSLIB.Topic({ ros, name: '/map', messageType: 'nav_msgs/msg/OccupancyGrid' });
-  mapTopic.subscribe(msg => {
+  // Nav2 map_server publishes /map with transient_local durability.
+  // Use service call to reliably fetch the map, then also subscribe for updates.
+
+  function applyMapMsg(msg) {
     mapResolution = msg.info.resolution;
     mapWidth      = msg.info.width;
     mapHeight     = msg.info.height;
     mapOriginX    = msg.info.origin.position.x;
     mapOriginY    = msg.info.origin.position.y;
     occupancyData = new Int8Array(msg.data);
-
+    buildOccupancyCache();
     fitMapToCanvas();
     redrawMap();
     document.getElementById('map-overlay-msg').style.display = 'none';
+  }
+
+  // Method 1: Service call (most reliable for latched/transient_local maps)
+  const mapService = new ROSLIB.Service({
+    ros,
+    name: '/map_server/map',
+    serviceType: 'nav_msgs/srv/GetMap',
+  });
+  mapService.callService(new ROSLIB.ServiceRequest({}), (result) => {
+    if (result && result.map) {
+      console.log('[MAP] Loaded via service call:', result.map.info.width, 'x', result.map.info.height);
+      applyMapMsg(result.map);
+    }
+  }, (err) => {
+    console.warn('[MAP] Service call failed, relying on topic subscription:', err);
+  });
+
+  // Method 2: Topic subscription with transient_local QoS (for live updates)
+  const mapTopic = new ROSLIB.Topic({
+    ros,
+    name: '/map',
+    messageType: 'nav_msgs/msg/OccupancyGrid',
+    // rosbridge ROS2 supports qos overrides
+    qos: { durability: 1, reliability: 1, history: 1, depth: 1 },
+  });
+  mapTopic.subscribe(msg => {
+    applyMapMsg(msg);
   });
 
   // ── /scan — LiDAR
@@ -2019,15 +2126,14 @@ function fitMapToCanvas() {
 // ── Coordinate conversion ─────────────────────────────────────
 
 function worldToCanvas(wx, wy) {
-  // ROS map: origin bottom-left, Y up.  Canvas: origin top-left, Y down.
   const cx = (wx - mapOriginX) * mapScale + mapPanOffset.x;
-  const cy = mapCanvas.height - ((wy - mapOriginY) * mapScale) - mapPanOffset.y;
+  const cy = (mapHeight * mapResolution - (wy - mapOriginY)) * mapScale + mapPanOffset.y;
   return { x: cx, y: cy };
 }
 
 function canvasToWorld(cx, cy) {
   const wx = (cx - mapPanOffset.x) / mapScale + mapOriginX;
-  const wy = (mapCanvas.height - cy - mapPanOffset.y) / mapScale + mapOriginY;
+  const wy = mapOriginY + mapHeight * mapResolution - (cy - mapPanOffset.y) / mapScale;
   return { x: wx, y: wy };
 }
 
@@ -2047,7 +2153,7 @@ function _doRedraw() {
   mapCtx.fillStyle = '#1a2535';
   mapCtx.fillRect(0, 0, W, H);
 
-  if (occupancyData) drawOccupancyGrid();
+  if (occupancyCachedCanvas) drawOccupancyGrid();
   if (histVisible   && poseHistory.length > 1) drawPoseHistory();
   if (pathVisible   && globalPath.length  > 1) drawGlobalPath();
   if (lidarVisible  && lidarPoints.length  > 0) drawLiDAR();
@@ -2057,43 +2163,38 @@ function _doRedraw() {
   if (isDragging && dragStart && dragCurrent) drawDragArrow();
 }
 
-function drawOccupancyGrid() {
-  const ctx = mapCtx;
-  const cellPx = mapResolution * mapScale;
-
-  // Use ImageData for performance
-  const iw = Math.ceil(mapWidth  * cellPx);
-  const ih = Math.ceil(mapHeight * cellPx);
-  if (iw <= 0 || ih <= 0) return;
-
-  const offCanvas = document.createElement('canvas');
-  offCanvas.width = iw; offCanvas.height = ih;
-  const octx = offCanvas.getContext('2d');
-  const img = octx.createImageData(iw, ih);
-
+function buildOccupancyCache() {
+  if (!occupancyData || !mapWidth || !mapHeight) return;
+  occupancyCachedCanvas = document.createElement('canvas');
+  occupancyCachedCanvas.width  = mapWidth;
+  occupancyCachedCanvas.height = mapHeight;
+  const octx = occupancyCachedCanvas.getContext('2d');
+  const img  = octx.createImageData(mapWidth, mapHeight);
   for (let gy = 0; gy < mapHeight; gy++) {
     for (let gx = 0; gx < mapWidth; gx++) {
       const val = occupancyData[gy * mapWidth + gx];
       let r, g, b, a;
-      if (val === -1) { r=80; g=90; b=100; a=200; }       // unknown — grey
-      else if (val === 0) { r=230; g=235; b=240; a=255; }  // free — light
-      else { r=20; g=25; b=30; a=255; }                    // occupied — dark
-
-      const px = Math.floor(gx * cellPx);
-      const py = Math.floor((mapHeight - 1 - gy) * cellPx); // flip Y
-      const pw = Math.max(1, Math.ceil(cellPx));
-      const ph = Math.max(1, Math.ceil(cellPx));
-
-      for (let dy = 0; dy < ph && py+dy < ih; dy++) {
-        for (let dx = 0; dx < pw && px+dx < iw; dx++) {
-          const i = ((py+dy) * iw + (px+dx)) * 4;
-          img.data[i]=r; img.data[i+1]=g; img.data[i+2]=b; img.data[i+3]=a;
-        }
-      }
+      if (val === -1)      { r=80;  g=90;  b=100; a=200; }
+      else if (val === 0)  { r=230; g=235; b=240; a=255; }
+      else                 { r=20;  g=25;  b=30;  a=255; }
+      const pi = ((mapHeight - 1 - gy) * mapWidth + gx) * 4;
+      img.data[pi]   = r;
+      img.data[pi+1] = g;
+      img.data[pi+2] = b;
+      img.data[pi+3] = a;
     }
   }
   octx.putImageData(img, 0, 0);
-  ctx.drawImage(offCanvas, mapPanOffset.x, mapPanOffset.y);
+}
+
+function drawOccupancyGrid() {
+  if (!occupancyCachedCanvas) return;
+  const ctx = mapCtx;
+  const dw  = mapWidth  * mapResolution * mapScale;
+  const dh  = mapHeight * mapResolution * mapScale;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(occupancyCachedCanvas, mapPanOffset.x, mapPanOffset.y, dw, dh);
+  ctx.imageSmoothingEnabled = true;
 }
 
 function drawPoseHistory() {
@@ -2687,10 +2788,202 @@ function initPIDCharts() {
 }
 
 /* ════════════════════════════════════════════════════════════
+   ORDERS — CRUD & PICK WORKFLOW
+════════════════════════════════════════════════════════════ */
+let _orders = [];
+
+async function loadOrders() {
+  try {
+    _orders = await api('/orders');
+    renderOrders(_orders);
+  } catch(e) { console.error('Orders load:', e); }
+}
+
+function renderOrders(data) {
+  setCount('cnt-orders', data.length);
+  const tb = document.getElementById('body-orders');
+  if (!data.length) { emptyRow(tb, 8); return; }
+  tb.innerHTML = data.map(r => {
+    const pct = r.item_count ? Math.round((r.picked_count / r.item_count) * 100) : 0;
+    return `<tr>
+      <td class="id">${esc(r.id)}</td>
+      <td class="code" style="cursor:pointer;color:var(--blue)" onclick="viewOrder(${r.id})">${esc(r.order_code)}</td>
+      <td>${esc(r.assigned_robot ?? '—')}</td>
+      <td><span class="order-status ${r.status}">${r.status}</span></td>
+      <td>${r.picked_count}/${r.item_count}</td>
+      <td><div class="order-progress"><div class="order-progress-fill" style="width:${pct}%"></div></div>${pct}%</td>
+      <td class="time">${esc(r.created_at ?? '—')}</td>
+      <td class="acts">
+        ${r.status === 'PENDING' ? `<button class="btn btn-primary btn-sm" onclick="dispatchOrder(${r.id})">▶ Dispatch</button>` : ''}
+        ${r.status === 'PENDING' ? `<button class="btn btn-danger btn-sm" onclick="deleteOrder(${r.id},'${esc(r.order_code)}')">Del</button>` : ''}
+        ${r.status === 'IN_PROGRESS' ? `<button class="btn btn-ghost btn-sm" onclick="loadOrderToMission(${r.id})">📍 Load to AMR</button>` : ''}
+      </td></tr>`;
+  }).join('');
+}
+
+async function viewOrder(oid) {
+  try {
+    const d = await api('/orders/' + oid);
+    const panel = document.getElementById('order-detail-panel');
+    document.getElementById('order-detail-title').textContent = `Order #${d.id} — ${d.order_code} [${d.status}]`;
+    let html = '';
+
+    // Items summary
+    html += `<div style="margin:12px 0 8px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Order Items</div>`;
+    html += `<table style="width:100%;font-size:12px"><thead><tr><th>Product</th><th>Qty</th><th>Picked</th><th>Status</th></tr></thead><tbody>`;
+    (d.items || []).forEach(it => {
+      html += `<tr><td>${esc(it.product_code ?? '')} ${esc(it.product_name ?? '')}</td><td>${it.quantity}</td><td>${it.picked_qty}</td><td><span class="order-status ${it.status}">${it.status ?? 'PENDING'}</span></td></tr>`;
+    });
+    html += `</tbody></table>`;
+
+    // Pick tasks route
+    html += `<div style="margin:16px 0 8px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Pick Route (${(d.pick_tasks||[]).length} stops)</div>`;
+    (d.pick_tasks || []).forEach(pt => {
+      html += `<div class="pick-task-row">
+        <div class="pick-task-seq ${pt.status}">${pt.seq}</div>
+        <div class="pick-task-info">
+          <div><strong>${esc(pt.location_code ?? '?')}</strong> — ${esc(pt.product_name ?? '')} ×${pt.quantity}</div>
+          <div style="color:var(--muted);font-family:var(--mono);font-size:10px">
+            x=${pt.nav_x?.toFixed(3)} y=${pt.nav_y?.toFixed(3)} yaw=${pt.nav_yaw?.toFixed(3)}
+          </div>
+        </div>
+        <div class="pick-task-status"><span class="order-status ${pt.status}">${pt.status}</span></div>
+      </div>`;
+    });
+
+    document.getElementById('order-detail-body').innerHTML = html;
+    panel.style.display = 'block';
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+function closeOrderDetail() {
+  document.getElementById('order-detail-panel').style.display = 'none';
+}
+
+/* ── Create Order Modal ────────────────────────────────────── */
+function openCreateOrder() {
+  modalCtx = { table: '_order', mode: 'add' };
+  document.getElementById('modal-title').textContent = 'Create Pick Order';
+  const pOpts = _products.map(p => `<option value="${p.id}">${esc(p.product_code)} — ${esc(p.name ?? '')}</option>`).join('');
+  document.getElementById('modal-body').innerHTML = `
+    <div class="form-grid one">
+      <div class="field"><label>Order Code *</label><input id="f-oc" placeholder="ORD-001"/></div>
+      <div class="field"><label>Assigned Robot</label><input id="f-ar" placeholder="AMR_01" value="AMR_01"/></div>
+    </div>
+    <div style="margin:10px 0 4px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">
+      Items <button class="btn btn-ghost btn-sm" onclick="addOrderItemRow()" style="margin-left:8px">+ Add Item</button>
+    </div>
+    <div id="order-create-items"></div>
+  `;
+  addOrderItemRow();
+  document.getElementById('modal-save').textContent = 'Create Order';
+  document.getElementById('modal-save').onclick = submitCreateOrder;
+  document.getElementById('form-modal').classList.add('open');
+}
+
+let _ocItemCounter = 0;
+function addOrderItemRow() {
+  _ocItemCounter++;
+  const pOpts = _products.map(p => `<option value="${p.id}">${esc(p.product_code)} — ${esc(p.name ?? '')}</option>`).join('');
+  const container = document.getElementById('order-create-items');
+  const row = document.createElement('div');
+  row.className = 'oc-item-row';
+  row.id = 'oc-row-' + _ocItemCounter;
+  row.innerHTML = `
+    <select class="oc-prod"><option value="">— product —</option>${pOpts}</select>
+    <input type="number" class="oc-qty" min="1" value="1" placeholder="Qty"/>
+    <button onclick="this.parentElement.remove()">✕</button>
+  `;
+  container.appendChild(row);
+}
+
+async function submitCreateOrder() {
+  const code = getv('f-oc');
+  const robot = getv('f-ar');
+  if (!code) { toast('Order Code required', 'err'); return; }
+  const rows = document.querySelectorAll('.oc-item-row');
+  const items = [];
+  for (const r of rows) {
+    const pid = r.querySelector('.oc-prod').value;
+    const qty = r.querySelector('.oc-qty').value;
+    if (pid && qty && +qty > 0) items.push({ product_id: +pid, quantity: +qty });
+  }
+  if (!items.length) { toast('Add at least one item', 'err'); return; }
+
+  try {
+    await api('/orders', {
+      method: 'POST',
+      body: JSON.stringify({ order_code: code, assigned_robot: robot || null, items }),
+    });
+    toast('Order created');
+    closeModal('form-modal');
+    // Restore default save handler
+    document.getElementById('modal-save').onclick = saveRecord;
+    loadOrders();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+/* ── Dispatch & Delete ─────────────────────────────────────── */
+async function dispatchOrder(oid) {
+  try {
+    const d = await api('/orders/' + oid + '/dispatch', { method: 'POST' });
+    toast('Order dispatched — ' + (d.pick_tasks?.length ?? 0) + ' pick stops');
+    loadOrders();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function deleteOrder(oid, label) {
+  if (!confirm('Delete order ' + label + '?')) return;
+  try {
+    await api('/orders/' + oid, { method: 'DELETE' });
+    toast('Order deleted');
+    loadOrders();
+    closeOrderDetail();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+/* ── Seed demo data ────────────────────────────────────────── */
+async function seedDemo() {
+  try {
+    const r = await api('/seed-demo', { method: 'POST' });
+    toast(r.status === 'already_seeded' ? 'Already seeded' : 'Demo data seeded!');
+    loadCrud();
+    loadOrders();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+/* ── Load order pick tasks into AMR Mission Planner ────────── */
+async function loadOrderToMission(oid) {
+  try {
+    const d = await api('/orders/' + oid);
+    if (!d.pick_tasks?.length) { toast('No pick tasks', 'err'); return; }
+    // Clear existing waypoints
+    clearWaypoints();
+    // Add each pick task as a waypoint
+    d.pick_tasks.forEach(pt => {
+      if (pt.status === 'PICKED') return; // skip already picked
+      missionWaypoints.push({
+        x: pt.nav_x, y: pt.nav_y, yaw: pt.nav_yaw,
+        label: pt.location_code ?? ('Stop ' + pt.seq),
+      });
+    });
+    renderWaypointList();
+    redrawMap();
+    // Switch to AMR tab
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelector('[data-tab="amr"]').classList.add('active');
+    document.getElementById('tab-amr').classList.add('active');
+    toast('Loaded ' + missionWaypoints.length + ' waypoints from order');
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+/* ════════════════════════════════════════════════════════════
    BOOT
 ════════════════════════════════════════════════════════════ */
 connectWS();   // start WebSocket — handles live view
 loadCrud();    // load all CRUD tables once
+loadOrders();  // load orders
 </script>
 </body>
 </html>

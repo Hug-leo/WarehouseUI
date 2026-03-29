@@ -1,39 +1,103 @@
 # Warehouse AMR Dashboard
 
-A FastAPI + SQL Server backend with a real-time HTML dashboard for tracking Autonomous Mobile Robot (AMR) QR scans.
+A **FastAPI v3 backend** with **WebSocket real-time** support and an interactive HTML dashboard for tracking Autonomous Mobile Robot (AMR) operations, inventory, and QR code scans.
+
+**New in v3**: WebSocket endpoint (`/ws`), enriched scan records with product & inventory joins, and instant dashboard updates.
 
 ---
 
 ## Project Structure
 
 ```
-warehouse_server/
-├── server.py      ← FastAPI backend (all logic lives here)
-└── index.html     ← Dashboard UI (auto-refreshes every 3 s)
+Warehouse/
+├── server.py           ← FastAPI backend (v3 with WebSocket)
+├── index.html          ← Modern dashboard UI (7 tabs)
+├── MJPEG stream on PC.py
+└── README.md
 ```
+
+**Dashboard Tabs**:
+
+- **Live View** — Real-time scan spotlight + history feed
+- **Robots** — CRUD for robot inventory
+- **Locations** — CRUD for warehouse racks & slots
+- **Products** — CRUD for product catalog
+- **Inventory** — Track product quantities by location
+- **Scan Logs** — View & manage all scans
+- **Camera** — MJPEG stream viewer
+- **AMR Control** — Robot teleoperation & navigation (ROS integration ready)
 
 ---
 
 ## Prerequisites
 
-| Requirement                     | Notes                                              |
-|---------------------------------|----------------------------------------------------|
-| Python 3.10+                    | —                                                  |
-| SQL Server (Express or full)    | Running locally or on your network                 |
-| ODBC Driver 17 for SQL Server   | https://aka.ms/downloadmsodbcsql                   |
-| WarehouseDB database            | Must exist before starting the server              |
+| Requirement                   | Notes                                                       |
+| ----------------------------- | ----------------------------------------------------------- |
+| Python 3.10+                  | —                                                           |
+| SQL Server (Express or full)  | Running locally or on your network                          |
+| ODBC Driver 17 for SQL Server | https://aka.ms/downloadmsodbcsql                            |
+| WarehouseDB database          | Must exist before starting the server (auto-creates tables) |
+| (Optional) Flask/MJPEG server | For MJPEG camera streaming                                  |
+| (Optional) ROS 2 / Nav2       | For AMR control features (advanced)                         |
 
----
+## Database Schema
 
-## 1 — Install Python dependencies
+The server auto-creates these tables on startup:
 
-```bash
-pip install fastapi uvicorn pyodbc
+```sql
+-- Robots: AMR fleet registry
+CREATE TABLE Robots (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    robot_code NVARCHAR(50) NOT NULL,
+    description NVARCHAR(100)
+);
+
+-- Locations: Warehouse racks & storage slots
+CREATE TABLE Locations (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    location_code NVARCHAR(50) NOT NULL,
+    rack NVARCHAR(50),
+    slot NVARCHAR(50)
+);
+
+-- Products: SKU & product catalog
+CREATE TABLE Products (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    product_code NVARCHAR(50) NOT NULL,
+    name NVARCHAR(100),
+    category NVARCHAR(100)
+);
+
+-- Inventory: Stock quantities
+CREATE TABLE Inventory (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    product_id INT,
+    location_id INT,
+    quantity INT
+);
+
+-- ScanLogs: QR scan events
+CREATE TABLE ScanLogs (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    robot_code NVARCHAR(50),
+    qr_code NVARCHAR(50),
+    scan_time DATETIME DEFAULT GETDATE()
+);
 ```
 
 ---
 
-## 2 — Create the database
+## Setup & Configuration
+
+### 1. Install Python Dependencies
+
+```bash
+pip install fastapi uvicorn pyodbc python-multipart
+```
+
+---
+
+### 2. Create the Database
 
 Open **SQL Server Management Studio** (or `sqlcmd`) and run:
 
@@ -41,13 +105,13 @@ Open **SQL Server Management Studio** (or `sqlcmd`) and run:
 CREATE DATABASE WarehouseDB;
 ```
 
-> The server will auto-create **Locations** and **ScanLogs** tables on first startup.
+> The server will auto-create all five tables on first startup.
 
 ---
 
-## 3 — Configure the server
+### 3. Configure the Server
 
-Edit **`server.py`**, find `DB_CONFIG` near the top, and set your server name:
+Edit [server.py](server.py), find `DB_CONFIG` near the top, and set your SQL Server name:
 
 ```python
 DB_CONFIG = {
@@ -58,31 +122,54 @@ DB_CONFIG = {
 }
 ```
 
-To find your server name:
+**To find your SQL Server name**, run in PowerShell or cmd:
 
-```sql
--- Run this in SSMS
-SELECT @@SERVERNAME;
+```bash
+sqlcmd -S . -Q "SELECT @@SERVERNAME;"
 ```
+
+Or in **SQL Server Management Studio**, look at the server name in the title bar or Object Explorer.
 
 ---
 
-## 4 — Run the server
+### 4. Run the Server
 
 ```bash
-cd warehouse_server
 uvicorn server:app --reload --host 0.0.0.0 --port 8000
 ```
 
-- Dashboard → http://localhost:8000
-- API docs  → http://localhost:8000/docs
+When the server starts, it will:
+
+1. Auto-create all 5 database tables if they don't exist
+2. Print `[DB] Tables verified.` to confirm
+3. Listen on port 8000
+
+**Access the dashboard**:
+
+- **UI Dashboard** → http://localhost:8000
+- **FastAPI Docs** → http://localhost:8000/docs
+- **WebSocket Endpoint** → ws://localhost:8000/ws (used by dashboard for real-time updates)
 
 ---
 
-## 5 — API Reference
+## API Endpoints
 
-### `POST /scan`
-Robot sends a QR scan event.
+### Core CRUD Operations
+
+All tables support standard REST operations:
+
+```
+GET    /{table}        — List all rows
+POST   /{table}        — Create new row
+PUT    /{table}/{id}   — Update row
+DELETE /{table}/{id}   — Delete row
+```
+
+**Tables**: `robots`, `locations`, `products`, `inventory`, `scanlogs`
+
+### Real-Time Scan Ingestion
+
+**`POST /scan`** — Robot sends a QR scan
 
 ```bash
 curl -X POST http://localhost:8000/scan \
@@ -90,52 +177,79 @@ curl -X POST http://localhost:8000/scan \
   -d '{"robot_code":"AMR_01","qr_code":"RACK_A_01"}'
 ```
 
-Response:
-```json
-{ "status": "ok" }
-```
+Response: `{"status": "ok"}`
 
----
+**What happens**:
 
-### `GET /logs`
-Returns the 50 most recent scan entries (newest first).
+1. Inserts into `ScanLogs`
+2. Fetches enriched join: ScanLog → Location → Inventory → Product
+3. **Broadcasts to ALL connected WebSocket clients instantly**
+
+### Scan History
+
+**`GET /scanlogs`** — Retrieve recent scans (top 100)
 
 ```bash
-curl http://localhost:8000/logs
+curl http://localhost:8000/scanlogs
 ```
 
 Response:
+
 ```json
 [
-  { "id": 3, "robot": "AMR_01", "qr": "RACK_A_01", "time": "2026-03-11 21:00:00" },
-  ...
+  {
+    "id": 1,
+    "robot_code": "AMR_01",
+    "qr_code": "RACK_A_01",
+    "scan_time": "2026-03-27 12:34:56"
+  }
 ]
 ```
 
----
+### Health Check
 
-### `GET /health`
-Quick liveness probe (does not touch the DB).
+**`GET /health`** — API liveness probe
 
 ```bash
 curl http://localhost:8000/health
 ```
 
----
+Response:
 
-## 6 — Dashboard features
-
-| Feature                  | Detail                                         |
-|--------------------------|------------------------------------------------|
-| Auto-refresh             | Polls `/logs` every **3 seconds**              |
-| New-row highlight        | Rows that didn't exist on the last fetch flash amber |
-| Stats bar                | Shows total logs, active robots, unique locations, last scan |
-| API status               | ONLINE (green) / OFFLINE (red)                 |
-| Manual scan injection    | Bottom panel — POST a scan directly from the browser |
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-03-27T12:00:00.000000",
+  "ws_clients": 3
+}
+```
 
 ---
 
-## 7 — Raspberry Pi robot integration
+## WebSocket Real-Time Updates
+
+The dashboard connects via `ws://localhost:8000/ws` and receives live scan events:
+
+```javascript
+// Example: browser WebSocket client
+const ws = new WebSocket("ws://localhost:8000/ws");
+
+ws.onmessage = (event) => {
+  const msg = JSON.parse(event.data);
+
+  if (msg.type === "history") {
+    // On connect: receive last 20 scans
+    console.log("History:", msg.data);
+  } else if (msg.type === "scan") {
+    // Real-time: new scan was recorded
+    console.log("New scan:", msg.data);
+  }
+};
+```
+
+---
+
+## Robot Integration (Raspberry Pi / Python)
 
 On the robot, install `requests`:
 
@@ -143,27 +257,79 @@ On the robot, install `requests`:
 pip install requests
 ```
 
-After decoding a QR code with OpenCV:
+After decoding a QR code with OpenCV, send a scan event:
 
 ```python
 import requests
+import json
 
-SERVER_IP = "192.168.x.x"   # IP of the machine running uvicorn
-QR_STRING = "RACK_A_01"     # decoded from camera
+SERVER_IP = "192.168.1.100"   # IP of the machine running uvicorn
+PORT = 8000
+ROBOT_CODE = "AMR_01"
 
-response = requests.post(
-    f"http://{SERVER_IP}:8000/scan",
-    json={"robot_code": "AMR_01", "qr_code": QR_STRING},
-    timeout=5,
-)
-print(response.json())   # {"status": "ok"}
+def send_scan(qr_code):
+    """Send QR scan to the Warehouse server."""
+    try:
+        response = requests.post(
+            f"http://{SERVER_IP}:{PORT}/scan",
+            json={"robot_code": ROBOT_CODE, "qr_code": qr_code},
+            timeout=5,
+        )
+        data = response.json()
+        print(f"✓ Scan sent: {qr_code} → {data['status']}")
+        return True
+    except Exception as e:
+        print(f"✗ Scan failed: {e}")
+        return False
+
+# Example: after finding QR code with OpenCV
+qr_result = "RACK_A_01"
+send_scan(qr_result)
 ```
 
 ---
 
-## 8 — Adding more robots or rack locations
+## Dashboard Features
 
-**Register rack locations** (optional — for future FK lookups):
+| Tab             | Purpose                                                     |
+| --------------- | ----------------------------------------------------------- |
+| **Live View**   | Real-time scan spotlight + history feed                     |
+| **Robots**      | List, add, edit, delete robot records                       |
+| **Locations**   | Manage warehouse racks & slots                              |
+| **Products**    | Product catalog (SKU, name, category)                       |
+| **Inventory**   | Track stock by product & location (with joins)              |
+| **Scan Logs**   | View all QR scan events with timestamps                     |
+| **Camera**      | Live MJPEG stream viewer (configure camera URL in UI)       |
+| **AMR Control** | Teleoperation, waypoint navigation, IMU display (ROS ready) |
+
+**Key Features**:
+
+- ✨ **WebSocket real-time updates** — No polling, instant dashboard refresh
+- 📊 **Enriched scan data** — Each scan includes location, product, and inventory details
+- 🔄 **Full CRUD** — Manage all entities through the web UI
+- 📈 **Stats panel** — Displays summary metrics
+- 📹 **Camera integration** — MJPEG stream support (configure URL in Settings)
+- 🤖 **ROS-ready** — AMR control tab prepared for Navigation2 integration
+
+---
+
+## Common Tasks
+
+### Add a New Robot
+
+**Via API**:
+
+```bash
+curl -X POST http://localhost:8000/robots \
+  -H "Content-Type: application/json" \
+  -d '{"robot_code":"AMR_02","description":"Secondary carrier"}'
+```
+
+**Via Dashboard**: Click the **Robots** tab → **Add** button
+
+### Register Warehouse Locations
+
+**Via SQL** (optional, for initial setup):
 
 ```sql
 INSERT INTO Locations (location_code, rack, slot)
@@ -172,14 +338,73 @@ VALUES ('RACK_A_01', 'A', '01'),
        ('RACK_B_01', 'B', '01');
 ```
 
-**Add a second robot** — just change `robot_code` in the POST body. No schema changes needed.
+**Via Dashboard**: **Locations** tab → **Add** button
+
+### Add Products to Inventory
+
+1. **Create product** in **Products** tab
+2. **Create inventory record** linking product + location + quantity in **Inventory** tab
+3. When robot scans, dashboard will display enriched data: robot → location → product → quantity
 
 ---
 
-## 9 — Next development steps
+## Troubleshooting
 
-- [ ] Add pagination to `/logs` (skip / limit query params)
-- [ ] Add `/stats` endpoint aggregating by robot and rack
-- [ ] Add authentication (API key header) before exposing to the network
-- [ ] Persist dashboard preferences (robot filter, time range)
-- [ ] Add WebSocket push so the dashboard reacts instantly instead of polling
+| Issue                            | Solution                                                                               |
+| -------------------------------- | -------------------------------------------------------------------------------------- |
+| `DB connection failed`           | Check `DB_CONFIG` server name matches `SELECT @@SERVERNAME;`                           |
+| `[WinError 10048]` (port in use) | Change `--port 8000` to an available port                                              |
+| WebSocket not connecting         | Ensure dashboard URL matches server IP/port (check browser console)                    |
+| Tables missing after startup     | Check `[DB] Tables verified.` message in terminal; run ` init_db()` manually if needed |
+| MJPEG camera not loading         | Verify camera server is running and URL is correct in dashboard                        |
+
+---
+
+## Architecture
+
+```
+┌─────────────────────┐
+│  Browser Dashboard  │  (HTML/CSS/JS)
+│   (8 tabs)          │
+└──────────┬──────────┘
+           │ HTTP / WebSocket
+           ▼
+┌─────────────────────┐
+│  FastAPI Server     │  (Python)
+│  (server.py)        │  • CORS enabled
+└──────────┬──────────┘  • Auto-init DB
+           │ pyodbc
+           ▼
+┌─────────────────────┐
+│  SQL Server         │  (5 tables)
+│  WarehouseDB        │  • Robots
+└─────────────────────┘  • Locations
+                          • Products
+                          • Inventory
+                          • ScanLogs
+```
+
+---
+
+## Next Steps & Future Development
+
+- [ ] **Pagination** — Add limit/offset to list endpoints
+- [ ] **Aggregation** — `/stats` endpoint for analytics
+- [ ] **Authentication** — API key or JWT before exposing to network
+- [ ] **Dashboard Preferences** — Persist filters and view settings per user
+- [ ] **ROS 2 Integration** — Full Navigation2 package integration for autonomous navigation
+- [ ] **Performance** — Index ScanLogs table on `scan_time` and `robot_code`
+- [ ] **Export** — CSV/Excel reports of scan history and inventory
+- [ ] **Alerts** — Notify on low stock, robot offline, location empty
+
+---
+
+## License
+
+[Add your license here, e.g., MIT, Apache 2.0]
+
+---
+
+## Support
+
+For issues or questions, check the [FastAPI documentation](https://fastapi.tiangolo.com/) or SQL Server ODBC [driver docs](https://learn.microsoft.com/en-us/sql/connect/odbc/microsoft-odbc-driver-for-sql-server).

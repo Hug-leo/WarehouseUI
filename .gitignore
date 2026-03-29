@@ -1,0 +1,20 @@
+# ── Pi robot workspace (uploaded to a separate repo) ──────────
+Turtlebot3PI-master/
+
+# ── Python ────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# ── QR code images (generated locally) ───────────────────────
+qr_codes/
+
+# ── OS / editor ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+*.swp
