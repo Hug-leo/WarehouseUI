@@ -894,8 +894,8 @@ select option{background:var(--surface)}
       <button class="btn btn-primary btn-sm" onclick="openAdd('locations')">+ Add Location</button>
     </div>
     <div class="table-wrap">
-      <table><thead><tr><th>#</th><th>Location Code</th><th>Rack</th><th>Slot</th><th></th></tr></thead>
-      <tbody id="body-locations"><tr class="state-row"><td colspan="5"><span class="spinner"></span>Loading…</td></tr></tbody></table>
+      <table><thead><tr><th>#</th><th>Location Code</th><th>Rack</th><th>Slot</th><th>Map (x, y, yaw)</th><th></th></tr></thead>
+      <tbody id="body-locations"><tr class="state-row"><td colspan="6"><span class="spinner"></span>Loading…</td></tr></tbody></table>
     </div>
   </div>
 </div>
@@ -974,8 +974,8 @@ select option{background:var(--surface)}
     <!-- Stream URL bar (editable so user can paste the real Pi URL later) -->
     <div class="cam-url-bar">
       <span class="cam-url-lbl">Stream URL</span>
-      <input id="cam-url-input" type="text" value="http://RASPBERRY_PI_IP:5000/video"
-             placeholder="http://192.168.x.x:5000/video"
+      <input id="cam-url-input" type="text" value=""
+             placeholder="/camera-proxy?robot=AMR_01 (auto-filled)"
              spellcheck="false"/>
       <button class="btn btn-ghost btn-sm" onclick="applyUrl()">Apply</button>
     </div>
@@ -1005,12 +1005,8 @@ select option{background:var(--surface)}
         <button class="btn btn-primary btn-sm" style="margin-top:14px" onclick="startCamera()">Retry</button>
       </div>
 
-      <!-- Live feed — hidden until stream loads -->
-      <img id="cam-img"
-           style="display:none;width:100%;height:100%;object-fit:contain"
-           alt="Robot camera feed"
-           onload="onCamLoad()"
-           onerror="onCamError()"/>
+      <!-- Live feed container — innerHTML is nuked on stop to kill the MJPEG connection -->
+      <div id="cam-img-wrap"></div>
     </div>
 
     <!-- Footer info -->
@@ -1146,7 +1142,7 @@ select option{background:var(--surface)}
             <!-- populated by JS -->
           </div>
           <div style="margin-top:8px">
-            <button class="amr-btn amr-btn-ghost amr-btn-full" onclick="setInitialPose()">📍 Set Initial Pose (HOME)</button>
+            <button class="amr-btn amr-btn-ghost amr-btn-full" onclick="setInitialPose()">📍 2D Pose Estimate</button>
           </div>
         </div>
       </div>
@@ -1242,10 +1238,11 @@ select option{background:var(--surface)}
             <div style="display:flex;gap:6px;align-items:center">
               <select id="slam-map-select"
                 style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:12px;padding:6px 8px;border-radius:6px;outline:none">
-                <option value="">— no maps loaded —</option>
+                <option value="">— select a saved map —</option>
               </select>
               <button class="amr-btn amr-btn-ghost" onclick="listMaps()" title="Refresh map list" style="padding:6px 8px">🔄</button>
             </div>
+            <div id="slam-map-list-meta" style="margin-top:4px;font-family:var(--mono);font-size:10px;color:var(--muted)"></div>
           </div>
 
           <!-- Load map / Stop nav -->
@@ -1265,7 +1262,7 @@ select option{background:var(--surface)}
           <div style="display:flex;gap:6px;align-items:center">
             <input type="text" id="slam-map-name" placeholder="map name" value="warehouse_map"
               style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:12px;padding:6px 8px;border-radius:6px;outline:none"/>
-            <button class="amr-btn amr-btn-green" id="slam-save-btn" onclick="saveMap()">💾 Save</button>
+            <button class="amr-btn amr-btn-green" id="slam-save-btn" onclick="saveMap()" disabled>💾 Save</button>
           </div>
           <div id="slam-status-text" style="margin-top:6px;font-family:var(--mono);font-size:10px;color:var(--muted);min-height:16px"></div>
         </div>
@@ -1287,6 +1284,26 @@ select option{background:var(--surface)}
             <div style="text-align:center;padding:16px;color:var(--muted);font-family:var(--mono);font-size:10px">
               Switch to 📌 Add Waypoint mode then click the map
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="amr-card" style="border-color:var(--purple)">
+        <div class="amr-card-hdr">
+          <div class="amr-card-title" style="color:var(--purple)">Create Shelf Map (Permanent Save)</div>
+        </div>
+        <div class="amr-card-body">
+          <p style="font-size:10px;color:var(--muted);margin:0 0 8px 0">Move robot to shelf area, enable point mode, click map, name shelf, then save to DB.</p>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <button id="btn-multi-wp" class="amr-btn amr-btn-ghost" onclick="toggleMultiWaypointMode()" style="flex:2">📍 1. Enable Point Mode</button>
+            <button class="amr-btn amr-btn-ghost" onclick="clearDraftPoints()" style="flex:1">Clear Draft</button>
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <button class="amr-btn amr-btn-green" onclick="saveAllDraftWaypoints()" style="flex:2">💾 2. Save All To System</button>
+            <button class="amr-btn amr-btn-danger" onclick="clearAllSavedWaypoints()" style="flex:1">🗑 Reset</button>
+          </div>
+          <div id="dynamic-waypoints-list" class="wp-list">
+            <div style="text-align:center;padding:12px;color:var(--muted);font-family:var(--mono);font-size:10px">No shelf points yet.</div>
           </div>
         </div>
       </div>
@@ -1493,8 +1510,9 @@ select option{background:var(--surface)}
      JAVASCRIPT
 ════════════════════════════════════════════════════════════════ -->
 <script>
-const API = 'http://localhost:8000';
-const WS_URL = 'ws://localhost:8000/ws';
+// Dynamic origin — works on localhost, LAN, or over the internet (tunnel/VPS)
+const API    = location.origin;
+const WS_URL = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/ws';
 
 /* ── State ─────────────────────────────────────────────────── */
 let feed       = [];          // array of enriched scan objects (max 20)
@@ -1516,6 +1534,9 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'amr' && rosConnected) {
+      requestSlamMapList();
+    }
   });
 });
 
@@ -1698,12 +1719,14 @@ function renderRobots(data) {
 function renderLocations(data) {
   setCount('cnt-locations', data.length);
   const tb = document.getElementById('body-locations');
-  if (!data.length) { emptyRow(tb, 5); return; }
+  syncSavedShelfWaypoints(data);
+  if (!data.length) { emptyRow(tb, 6); return; }
   tb.innerHTML = data.map(r => `<tr>
     <td class="id">${esc(r.id)}</td>
     <td class="code">${esc(r.location_code)}</td>
     <td>${esc(r.rack??'—')}</td>
     <td>${esc(r.slot??'—')}</td>
+    <td style="font-family:var(--mono);font-size:11px">${r.loc_x != null ? Number(r.loc_x).toFixed(3) : '—'}, ${r.loc_y != null ? Number(r.loc_y).toFixed(3) : '—'}, ${r.loc_yaw != null ? Number(r.loc_yaw).toFixed(2) : '—'}</td>
     <td class="acts">
       <button class="btn btn-ghost btn-sm" onclick='openEdit("locations",${r.id},${jq(r)})'>Edit</button>
       <button class="btn btn-danger btn-sm" onclick='confirmDel("locations",${r.id},"${esc(r.location_code)}")'>Del</button>
@@ -1778,6 +1801,9 @@ const FORMS = {
     <div class="field full"><label>Location Code *</label><input id="f0" placeholder="RACK_A_01"/></div>
     <div class="field"><label>Rack</label><input id="f1" placeholder="A"/></div>
     <div class="field"><label>Slot</label><input id="f2" placeholder="01"/></div>
+    <div class="field"><label>Map X</label><input id="f3" type="number" step="0.001" placeholder="-0.546"/></div>
+    <div class="field"><label>Map Y</label><input id="f4" type="number" step="0.001" placeholder="-0.512"/></div>
+    <div class="field"><label>Yaw</label><input id="f5" type="number" step="0.01" placeholder="0.0"/></div>
   </div>`,
 
   products: () => `<div class="form-grid">
@@ -1819,7 +1845,7 @@ function openEdit(table, id, row) {
   // pre-fill
   const fill = (fid, v) => { const el=document.getElementById(fid); if(el) el.value = v??''; };
   if (table==='robots')     { fill('f0',row.robot_code);   fill('f1',row.description); fill('f2',row.status); fill('f3',row.ip_address); fill('f4',row.home_x); fill('f5',row.home_y); fill('f6',row.home_yaw); }
-  if (table==='locations')  { fill('f0',row.location_code);fill('f1',row.rack);fill('f2',row.slot); }
+  if (table==='locations')  { fill('f0',row.location_code);fill('f1',row.rack);fill('f2',row.slot); fill('f3',row.loc_x); fill('f4',row.loc_y); fill('f5',row.loc_yaw); }
   if (table==='products')   { fill('f0',row.product_code); fill('f1',row.name);fill('f2',row.category); }
   if (table==='inventory')  { fill('f0',row.product_id);   fill('f1',row.location_id);fill('f2',row.quantity); }
   if (table==='scanlogs')   { fill('f0',row.robot_code);   fill('f1',row.qr_code); }
@@ -1832,7 +1858,17 @@ async function saveRecord() {
   let body = {};
 
   if (table==='robots')    { body={robot_code:getv('f0'),description:getv('f1'),status:getv('f2'),ip_address:getv('f3')||null,home_x:getv('f4')?+getv('f4'):null,home_y:getv('f5')?+getv('f5'):null,home_yaw:getv('f6')?+getv('f6'):null}; if(!body.robot_code){toast('Robot Code required','err');return;} }
-  if (table==='locations') { body={location_code:getv('f0'),rack:getv('f1'),slot:getv('f2')}; if(!body.location_code){toast('Location Code required','err');return;} }
+  if (table==='locations') {
+    body={
+      location_code:getv('f0'),
+      rack:getv('f1'),
+      slot:getv('f2'),
+      loc_x:getv('f3')!==''?+getv('f3'):null,
+      loc_y:getv('f4')!==''?+getv('f4'):null,
+      loc_yaw:getv('f5')!==''?+getv('f5'):null,
+    };
+    if(!body.location_code){toast('Location Code required','err');return;}
+  }
   if (table==='products')  { body={product_code:getv('f0'),name:getv('f1'),category:getv('f2')}; if(!body.product_code){toast('Product Code required','err');return;} }
   if (table==='inventory') {
     const p=getv('f0'),l=getv('f1'),q=getv('f2');
@@ -1895,17 +1931,42 @@ function toast(msg, type='ok') {
    CAMERA
 ════════════════════════════════════════════════════════════ */
 
-// ← Replace with real Pi URL when you have it
-let MJPEG_URL = 'http://RASPBERRY_PI_IP:5000/video';
+// Camera streams through the server proxy — no direct Pi connection needed.
+// Default URL uses the proxy; user can override with a direct URL if on LAN.
+let MJPEG_URL = '';
 
 // Track load timeout so we can show error if img never fires onload
 let camLoadTimer = null;
 let camActive    = false;
+let camStreamToken = 0;
+
+/** Build the proxy camera URL for the currently selected (or first) robot. */
+function getCameraProxyUrl() {
+  const code = activeRobotCode || (_robots.length ? _robots[0].robot_code : 'AMR_01');
+  return location.origin + '/camera-proxy?robot=' + encodeURIComponent(code);
+}
+
+function normalizeCameraUrl(rawUrl) {
+  const isAbsolute = /^https?:\/\//i.test(rawUrl);
+  const url = new URL(rawUrl, location.origin);
+  if (!isAbsolute && url.pathname === '/camera-proxy') {
+    url.protocol = location.protocol;
+    url.host = location.host;
+  }
+  return url.toString();
+}
+
+function buildCameraRequestUrl(rawUrl) {
+  const url = new URL(normalizeCameraUrl(rawUrl));
+  url.searchParams.set('t', Date.now().toString());
+  return url.toString();
+}
 
 function applyUrl() {
   const val = document.getElementById('cam-url-input').value.trim();
   if (!val) return;
-  MJPEG_URL = val;
+  MJPEG_URL = normalizeCameraUrl(val);
+  document.getElementById('cam-url-input').value = MJPEG_URL;
   toast('Stream URL updated — press Start Camera to connect');
   // If stream is currently running, restart with new URL
   if (camActive) startCamera();
@@ -1913,11 +1974,17 @@ function applyUrl() {
 
 function startCamera() {
   camActive = true;
-  const img = document.getElementById('cam-img');
+  camStreamToken += 1;
+  const token = camStreamToken;
 
-  // Update URL from input field each time Start is pressed
+  // Use the input field value, or auto-build a proxy URL
   const inputVal = document.getElementById('cam-url-input').value.trim();
-  if (inputVal) MJPEG_URL = inputVal;
+  if (inputVal && !inputVal.includes('RASPBERRY_PI_IP')) {
+    MJPEG_URL = normalizeCameraUrl(inputVal);
+  } else {
+    MJPEG_URL = getCameraProxyUrl();
+    document.getElementById('cam-url-input').value = MJPEG_URL;
+  }
 
   // Show loading state
   showCamState('loading');
@@ -1926,17 +1993,27 @@ function startCamera() {
   document.getElementById('btn-stop-cam').disabled  = false;
   setCamBadge('connecting');
 
-  // Give the browser a moment to clear the old src before setting new one
-  img.src = '';
+  // Nuke any previous stream, then inject a fresh <img>
+  const wrap = document.getElementById('cam-img-wrap');
+  wrap.innerHTML = '';
+
   setTimeout(() => {
-    // Append timestamp to bust any browser cache
-    img.src = MJPEG_URL + '?t=' + Date.now();
+    if (!camActive || token !== camStreamToken) return;
+    const img = document.createElement('img');
+    img.id = 'cam-img';
+    img.style.cssText = 'width:100%;height:100%;object-fit:contain';
+    img.alt = 'Robot camera feed';
+    img.onload  = () => onCamLoad(token);
+    img.onerror = () => onCamError(token);
+    img.src = buildCameraRequestUrl(MJPEG_URL);
+    wrap.appendChild(img);
 
     // Timeout: if onload hasn't fired within 8 s, treat as offline
     clearTimeout(camLoadTimer);
     camLoadTimer = setTimeout(() => {
+      if (token !== camStreamToken || !camActive) return;
       if (!img.complete || img.naturalWidth === 0) {
-        onCamError();
+        onCamError(token);
       }
     }, 8000);
   }, 80);
@@ -1944,11 +2021,11 @@ function startCamera() {
 
 function stopCamera() {
   camActive = false;
+  camStreamToken += 1;
   clearTimeout(camLoadTimer);
 
-  const img = document.getElementById('cam-img');
-  img.src = '';                      // stops the MJPEG stream immediately
-  img.style.display = 'none';
+  // Nuke the wrapper innerHTML — the ONLY reliable way to abort an MJPEG stream
+  document.getElementById('cam-img-wrap').innerHTML = '';
 
   showCamState('idle');
   document.getElementById('btn-start-cam').disabled = false;
@@ -1957,7 +2034,8 @@ function stopCamera() {
   document.getElementById('cam-footer-info').textContent = 'No stream active';
 }
 
-function onCamLoad() {
+function onCamLoad(token = camStreamToken) {
+  if (!camActive || token !== camStreamToken) return;
   // img fired onload — stream is alive
   clearTimeout(camLoadTimer);
   showCamState('stream');
@@ -1966,10 +2044,10 @@ function onCamLoad() {
     '● Streaming from ' + MJPEG_URL;
 }
 
-function onCamError() {
+function onCamError(token = camStreamToken) {
   // img fired onerror, or our timeout fired
   clearTimeout(camLoadTimer);
-  if (!camActive) return;           // user stopped manually — ignore
+  if (!camActive || token !== camStreamToken) return;           // user stopped manually — ignore
 
   document.getElementById('cam-img').style.display = 'none';
   document.getElementById('cam-error-msg').textContent =
@@ -1989,12 +2067,7 @@ function showCamState(state) {
   document.getElementById('cam-idle').style.display    = state==='idle'    ? 'flex' : 'none';
   document.getElementById('cam-loading').style.display = state==='loading' ? 'flex' : 'none';
   document.getElementById('cam-error').style.display   = state==='error'   ? 'flex' : 'none';
-  const img = document.getElementById('cam-img');
-  if (state === 'stream') {
-    img.style.display = 'block';
-  } else {
-    img.style.display = 'none';
-  }
+  document.getElementById('cam-img-wrap').style.display = state==='stream' ? 'block' : 'none';
 }
 
 /** Update the status badge in the panel header */
@@ -2014,12 +2087,20 @@ function setCamBadge(state) {
   }
 }
 
-// Auto-start camera when the Camera tab is clicked
+function preloadCameraUrl() {
+  const input = document.getElementById('cam-url-input');
+  if (!input) return;
+  const val = input.value.trim();
+  if (!val) {
+    input.value = getCameraProxyUrl();
+  }
+}
+
+// Prefill URL when Camera tab is opened (no auto-start)
 document.querySelectorAll('.tab-btn').forEach(btn => {
   if (btn.dataset.tab === 'camera') {
     btn.addEventListener('click', () => {
-      // Small delay so the panel is visible before we start loading
-      setTimeout(() => { if (!camActive) startCamera(); }, 100);
+      setTimeout(preloadCameraUrl, 30);
     });
   }
 });
@@ -2064,6 +2145,18 @@ let amrMode = 'manual';
 // SLAM state
 let slamState = 'IDLE';  // IDLE | MAPPING | SAVING | SAVED | NAV | LOADING | ERROR
 let topicSlamCmd = null, topicSlamStatus = null, topicSlamMapList = null;
+let mapLoadExpected = false;  // gate: only show map when user clicks Load Map or Start SLAM
+let mapListLoaded = false;
+let mapListRetryTimer = null;
+let mapLoadRequestToken = 0;
+let mapSwitchInProgress = false;
+let mapSwitchTargetName = '';
+let mapSwitchTimeoutTimer = null;
+
+// Shelf mapping mode (persistent locations)
+let isMultiWpMode = false;
+let draftWaypoints = [];   // temporary points not yet saved to DB
+let squareWaypoints = [];  // persisted shelf points (from DB)
 
 // Current robot pose (map frame)
 let robotX = null, robotY = null, robotYaw = null;
@@ -2072,6 +2165,10 @@ let robotX = null, robotY = null, robotYaw = null;
 let goalX = null, goalY = null;
 let goalInitX = null;              // goal origin for distance calc
 let navState = 'IDLE';             // IDLE | NAVIGATING | SUCCESS | FAILED
+let localizationReady = false;
+let localizationRequested = false;
+let localizationWaitTimer = null;
+let initPosePending = false;
 
 // Trajectory history
 let poseHistory = [];
@@ -2122,14 +2219,8 @@ let pidTarL = 0, pidTarR = 0, pidActL = 0, pidActR = 0;
 const WHEEL_BASE = 0.30;
 const MAX_CHART_PTS = 50;
 
-// Preset waypoints (edit to match your map)
-const PRESETS = [
-  { name: 'Home / Charge',  x: -1.29553, y: -0.0492027, yaw: 0.1848,  color: '#27ae60' },
-  { name: 'Point A — Rack 1', x: -0.546,   y: -0.512,    yaw: -1.57,   color: '#9b59b6' },
-  { name: 'Point B — Rack 2', x:  0.997,   y: -0.417,    yaw:  0.0,    color: '#9b59b6' },
-  { name: 'Point C — Rack 3', x:  1.010,   y:  0.557,    yaw:  1.57,   color: '#9b59b6' },
-  { name: 'Point D — Rack 4', x: -0.534,   y:  0.278,    yaw:  3.14159, color: '#9b59b6' },
-];
+// Preset waypoints intentionally empty: runtime points come from saved map data.
+const PRESETS = [];
 
 // ── Multi-robot fleet UI ──────────────────────────────────────
 
@@ -2149,9 +2240,11 @@ function renderFleetDots() {
   wrap.innerHTML = _robots.map(r => {
     const conn = rosConnections[r.robot_code];
     const on = conn?.connected;
-    return `<div style="display:flex;align-items:center;gap:3px;cursor:pointer" title="${esc(r.robot_code)} — ${on ? 'Connected' : 'Offline'}${r.ip_address ? ' ('+esc(r.ip_address)+')' : ''}" onclick="document.getElementById('amr-robot-select').value='${esc(r.robot_code)}';switchActiveRobot('${esc(r.robot_code)}')">
+    const mode = conn?.mode || '';
+    const modeIcon = mode.includes('Cloud') ? '☁️' : (on ? '🔗' : '');
+    return `<div style="display:flex;align-items:center;gap:3px;cursor:pointer" title="${esc(r.robot_code)} — ${on ? (mode || 'Connected') : 'Offline'}${r.ip_address ? ' ('+esc(r.ip_address)+')' : ''}" onclick="document.getElementById('amr-robot-select').value='${esc(r.robot_code)}';switchActiveRobot('${esc(r.robot_code)}')">
       <div class="ros-dot${on ? ' on' : ''}" style="width:6px;height:6px"></div>
-      <span style="font-family:var(--mono);font-size:9px;color:${on ? 'var(--green)' : 'var(--muted)'}">${esc(r.robot_code)}</span>
+      <span style="font-family:var(--mono);font-size:9px;color:${on ? 'var(--green)' : 'var(--muted)'}">${modeIcon} ${esc(r.robot_code)}</span>
     </div>`;
   }).join('');
 }
@@ -2200,12 +2293,24 @@ function rosConnect() {
     }
 
     rosSetStatus('Connecting…', false);
-    const newRos = new ROSLIB.Ros({ url: 'ws://' + ip + ':9090' });
+    // Connect via server-side proxy instead of directly to the Pi
+    const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const proxyUrl = wsProto + '//' + location.host + '/ros-proxy?robot=' + encodeURIComponent(code);
+    const newRos = new ROSLIB.Ros({ url: proxyUrl });
 
     rosConnections[code] = { ros: newRos, connected: false, ip };
 
     newRos.on('connection', () => {
       rosConnections[code].connected = true;
+      // Detect connection mode (Cloud Bridge vs LAN)
+      fetch(API + '/robot-agents').then(r => r.json()).then(agents => {
+        const mode = agents[code] ? '☁️ Cloud Bridge' : '🔗 LAN';
+        rosConnections[code].mode = mode;
+        if (activeRobotCode === code) {
+          rosSetStatus(mode + ' — ' + ip, true);
+        }
+        renderFleetDots();
+      }).catch(() => renderFleetDots());
       if (activeRobotCode === code) {
         ros = newRos;
         rosConnected = true;
@@ -2215,7 +2320,6 @@ function rosConnect() {
         initPIDCharts();
         buildPresets();
       }
-      renderFleetDots();
     });
     newRos.on('error', () => {
       rosConnections[code].connected = false;
@@ -2245,6 +2349,21 @@ function rosDisconnect() {
   }
   ros = null;
   rosConnected = false;
+  if (mapListRetryTimer) {
+    clearInterval(mapListRetryTimer);
+    mapListRetryTimer = null;
+  }
+  mapListLoaded = false;
+  localizationReady = false;
+  localizationRequested = false;
+  initPosePending = false;
+  isDragging = false;
+  dragStart = null;
+  dragCurrent = null;
+  if (localizationWaitTimer) {
+    clearTimeout(localizationWaitTimer);
+    localizationWaitTimer = null;
+  }
   rosSetStatus('Disconnected', false);
   renderFleetDots();
 }
@@ -2259,15 +2378,19 @@ function rosSetStatus(msg, online) {
 function setupTopics() {
   // cmd_vel
   topicCmdVel = new ROSLIB.Topic({ ros, name: '/cmd_vel', messageType: 'geometry_msgs/Twist' });
+  topicCmdVel.advertise();
 
   // goal_pose
   topicGoal = new ROSLIB.Topic({ ros, name: '/goal_pose', messageType: 'geometry_msgs/PoseStamped' });
+  topicGoal.advertise();
 
   // initialpose
   topicInitPose = new ROSLIB.Topic({ ros, name: '/initialpose', messageType: 'geometry_msgs/PoseWithCovarianceStamped' });
+  topicInitPose.advertise();
 
   // PID
-  topicPID = new ROSLIB.Topic({ ros, name: '/pid_command', messageType: 'std_msgs/msg/String' });
+  topicPID = new ROSLIB.Topic({ ros, name: '/pid_command', messageType: 'std_msgs/String' });
+  topicPID.advertise();
 
   // ── amcl_pose → robot position + history
   const poseTopic = new ROSLIB.Topic({ ros, name: '/amcl_pose', messageType: 'geometry_msgs/PoseWithCovarianceStamped' });
@@ -2287,6 +2410,16 @@ function setupTopics() {
     updateIMUDisplay();
     updateNavStatus();
     redrawMap();
+
+    if (localizationRequested) {
+      localizationRequested = false;
+      localizationReady = true;
+      if (localizationWaitTimer) {
+        clearTimeout(localizationWaitTimer);
+        localizationWaitTimer = null;
+      }
+      toast('Localization acquired from nav2_amcl. Navigation enabled.', 'ok');
+    }
   });
 
   // ── IMU
@@ -2298,46 +2431,25 @@ function setupTopics() {
   });
 
   // ── /map — occupancy grid
-  // Nav2 map_server publishes /map with transient_local durability.
-  // Use service call to reliably fetch the map, then also subscribe for updates.
+  // Only render after the user explicitly starts SLAM or loads a saved map.
+  mapLoadExpected = false;
 
-  function applyMapMsg(msg) {
-    mapResolution = msg.info.resolution;
-    mapWidth      = msg.info.width;
-    mapHeight     = msg.info.height;
-    mapOriginX    = msg.info.origin.position.x;
-    mapOriginY    = msg.info.origin.position.y;
-    occupancyData = new Int8Array(msg.data);
-    buildOccupancyCache();
-    fitMapToCanvas();
-    redrawMap();
-    document.getElementById('map-overlay-msg').style.display = 'none';
-  }
-
-  // Method 1: Service call (most reliable for latched/transient_local maps)
-  const mapService = new ROSLIB.Service({
-    ros,
-    name: '/map_server/map',
-    serviceType: 'nav_msgs/srv/GetMap',
-  });
-  mapService.callService(new ROSLIB.ServiceRequest({}), (result) => {
-    if (result && result.map) {
-      console.log('[MAP] Loaded via service call:', result.map.info.width, 'x', result.map.info.height);
-      applyMapMsg(result.map);
-    }
-  }, (err) => {
-    console.warn('[MAP] Service call failed, relying on topic subscription:', err);
-  });
-
-  // Method 2: Topic subscription with transient_local QoS (for live updates)
   const mapTopic = new ROSLIB.Topic({
     ros,
     name: '/map',
     messageType: 'nav_msgs/msg/OccupancyGrid',
-    // rosbridge ROS2 supports qos overrides
     qos: { durability: 1, reliability: 1, history: 1, depth: 1 },
   });
   mapTopic.subscribe(msg => {
+    if (mapSwitchInProgress) {
+      console.log('[MAP] Switch completed via /map topic:', mapSwitchTargetName || '(unknown)');
+      mapSwitchInProgress = false;
+      if (mapSwitchTimeoutTimer) {
+        clearTimeout(mapSwitchTimeoutTimer);
+        mapSwitchTimeoutTimer = null;
+      }
+      setMapListMeta('Loaded map "' + (mapSwitchTargetName || 'selected') + '"');
+    }
     applyMapMsg(msg);
   });
 
@@ -2345,6 +2457,7 @@ function setupTopics() {
   const scanTopic = new ROSLIB.Topic({ ros, name: '/scan', messageType: 'sensor_msgs/msg/LaserScan' });
   let lastScanTime = 0;
   scanTopic.subscribe(msg => {
+    if (mapSwitchInProgress) return;
     if (Date.now() - lastScanTime < 100) return;   // 10 Hz cap
     lastScanTime = Date.now();
     if (robotX === null) return;
@@ -2397,19 +2510,47 @@ function setupTopics() {
   });
 
   // ── SLAM control topics
-  topicSlamCmd = new ROSLIB.Topic({ ros, name: '/slam/command', messageType: 'std_msgs/msg/String' });
-  topicSlamStatus = new ROSLIB.Topic({ ros, name: '/slam/status', messageType: 'std_msgs/msg/String' });
+  topicSlamCmd = new ROSLIB.Topic({ ros, name: '/slam/command', messageType: 'std_msgs/String' });
+  topicSlamCmd.advertise();   // pre-advertise so rosbridge creates the publisher immediately (DDS discovery)
+  topicSlamStatus = new ROSLIB.Topic({ ros, name: '/slam/status', messageType: 'std_msgs/String' });
   topicSlamStatus.subscribe(msg => {
+    console.log('[SLAM] Status received:', msg.data);
     updateSlamUI(msg.data);
   });
-  topicSlamMapList = new ROSLIB.Topic({ ros, name: '/slam/map_list', messageType: 'std_msgs/msg/String' });
-  topicSlamMapList.subscribe(msg => {
-    populateMapList(msg.data);
+  topicSlamMapList = new ROSLIB.Topic({
+    ros,
+    name: '/slam/map_list',
+    messageType: 'std_msgs/String',
   });
-  // Request map list on connect
-  setTimeout(() => {
-    topicSlamCmd.publish(new ROSLIB.Message({ data: 'list_maps' }));
-  }, 500);
+  topicSlamMapList.subscribe(msg => {
+    console.log('[SLAM] 🔔 map_list RECEIVED:', msg);
+    console.log('[SLAM]   msg.data:', msg?.data);
+    console.log('[SLAM]   typeof msg.data:', typeof msg?.data);
+    console.log('[SLAM]   msg keys:', Object.keys(msg || {}));
+    populateMapList(msg, 'ROS');
+  });
+  mapListLoaded = false;
+  requestSlamMapList();
+  // rosbridge/DDS discovery can lag briefly after WebSocket connect.
+  // Re-issue shortly after setup to guarantee command delivery.
+  setTimeout(() => requestSlamMapList(), 500);
+  setTimeout(() => requestSlamMapList(), 1500);
+  if (mapListRetryTimer) clearInterval(mapListRetryTimer);
+  mapListRetryTimer = setInterval(() => {
+    if (!rosConnected || mapListLoaded) {
+      clearInterval(mapListRetryTimer);
+      mapListRetryTimer = null;
+      return;
+    }
+    requestSlamMapList();
+  }, 1200);
+}
+
+function requestSlamMapList() {
+  if (!rosConnected || !topicSlamCmd) return;
+  console.log('[SLAM] 📢 Requesting map list via /slam/command');
+  setMapListMeta('Requesting saved maps…');
+  topicSlamCmd.publish(new ROSLIB.Message({ data: 'list_map' }));
 }
 
 // ── Map initialisation ────────────────────────────────────────
@@ -2497,6 +2638,7 @@ function _doRedraw() {
   drawGoalArrow();
   if (robotX !== null) drawRobot();
   if (isDragging && dragStart && dragCurrent) drawDragArrow();
+  if (initPosePending && dragStart && dragCurrent) drawInitialPoseMarker();
 }
 
 function buildOccupancyCache() {
@@ -2658,6 +2800,40 @@ function drawWaypointMarkers() {
       ctx.stroke();
     }
   });
+
+  // Shelf mapping points (saved from DB)
+  squareWaypoints.forEach((wp, i) => {
+    const c = worldToCanvas(wp.x, wp.y);
+    ctx.beginPath();
+    ctx.rect(c.x - 8, c.y - 8, 16, 16);
+    ctx.fillStyle = 'rgba(155, 89, 182, 0.25)';
+    ctx.fill();
+    ctx.strokeStyle = '#8e44ad';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#8e44ad';
+    ctx.font = `bold ${Math.max(8, mapScale*0.11)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`S${i + 1}`, c.x, c.y - 10);
+  });
+
+  // Draft shelf points (not saved yet)
+  draftWaypoints.forEach((wp, i) => {
+    const c = worldToCanvas(wp.x, wp.y);
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 7, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(52, 152, 219, 0.35)';
+    ctx.fill();
+    ctx.strokeStyle = '#3498db';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#3498db';
+    ctx.font = `bold ${Math.max(8, mapScale*0.11)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`D${i + 1}`, c.x, c.y - 10);
+  });
 }
 
 function drawGoalArrow() {
@@ -2710,6 +2886,42 @@ function drawDragArrow() {
   ctx.fill();
 }
 
+function drawInitialPoseMarker() {
+  if (!dragStart || !dragCurrent) return;
+  const ctx = mapCtx;
+  const s = worldToCanvas(dragStart.x, dragStart.y);
+  const e = worldToCanvas(dragCurrent.x, dragCurrent.y);
+  const angle = Math.atan2(e.y - s.y, e.x - s.x);
+  const len = Math.sqrt((e.x - s.x) ** 2 + (e.y - s.y) ** 2);
+
+  ctx.save();
+  ctx.translate(s.x, s.y);
+  ctx.rotate(angle);
+
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(len - 8, 0);
+  ctx.strokeStyle = '#2ecc71';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([6, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.beginPath();
+  ctx.moveTo(len, 0);
+  ctx.lineTo(len - 11, -6);
+  ctx.lineTo(len - 11,  6);
+  ctx.closePath();
+  ctx.fillStyle = '#2ecc71';
+  ctx.fill();
+
+  ctx.restore();
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#2ecc71';
+  ctx.fill();
+}
+
 // ── Map mouse / touch handlers ─────────────────────────────────
 
 function getCanvasPos(e) {
@@ -2726,6 +2938,15 @@ function onMapMouseDown(e) {
   const cp = getCanvasPos(e);
   const wp = canvasToWorld(cp.x, cp.y);
 
+  // Shelf point mode should capture click-to-save regardless of active map tool.
+  if (isMultiWpMode) {
+    draftWaypoints.push({ x: wp.x, y: wp.y, yaw: 0 });
+    updateDynamicWaypointsList();
+    redrawMap();
+    toast(`Draft shelf point added (${wp.x.toFixed(2)}, ${wp.y.toFixed(2)})`, 'ok');
+    return;
+  }
+
   if (activeTool === 'pan' || e.button === 1) {
     isPanning = true;
     panStart = { x: e.clientX - mapPanOffset.x, y: e.clientY - mapPanOffset.y };
@@ -2741,7 +2962,18 @@ function onMapMouseDown(e) {
     // Single click adds waypoint
     addMissionWaypoint(wp.x, wp.y, 0);
     redrawMap();
+    return;
   }
+
+  if (activeTool === 'init') {
+    isDragging = true;
+    initPosePending = true;
+    dragStart = { x: wp.x, y: wp.y };
+    dragCurrent = { x: wp.x, y: wp.y };
+    redrawMap();
+    return;
+  }
+
 }
 
 function onMapMouseMove(e) {
@@ -2761,10 +2993,30 @@ function onMapMouseMove(e) {
     dragCurrent = { x: wp.x, y: wp.y };
     redrawMap();
   }
+  if (isDragging && activeTool === 'init') {
+    dragCurrent = { x: wp.x, y: wp.y };
+    redrawMap();
+  }
 }
 
 function onMapMouseUp(e) {
   if (isPanning) { isPanning = false; return; }
+  if (isDragging && activeTool === 'init') {
+    isDragging = false;
+    if (dragStart && dragCurrent) {
+      const dx = dragCurrent.x - dragStart.x;
+      const dy = dragCurrent.y - dragStart.y;
+      const yaw = Math.hypot(dx, dy) < 0.02 ? (Number.isFinite(robotYaw) ? robotYaw : 0) : Math.atan2(dy, dx);
+      publishInitialPose(dragStart.x, dragStart.y, yaw);
+    }
+    initPosePending = false;
+    dragStart = null;
+    dragCurrent = null;
+    activeTool = 'nav';
+    setTool('nav');
+    redrawMap();
+    return;
+  }
   if (isDragging && activeTool === 'nav') {
     isDragging = false;
     if (dragStart) {
@@ -2803,13 +3055,15 @@ function mapResetView() { fitMapToCanvas(); redrawMap(); }
 
 function setTool(tool) {
   activeTool = tool;
-  ['nav','wp','pan'].forEach(t => {
-    document.getElementById('tool-' + t).classList.toggle('active', t === tool);
+  ['nav','wp','pan','init'].forEach(t => {
+    const btn = document.getElementById('tool-' + t);
+    if (btn) btn.classList.toggle('active', t === tool);
   });
   const hints = {
     nav:  'Click & drag on map to set goal + orientation',
     wp:   'Click map to add mission waypoints',
     pan:  'Click & drag to pan the map view',
+    init: 'Click-drag on the map like RViz: origin = robot position, arrow = robot heading',
   };
   document.getElementById('map-hint').textContent = hints[tool];
   if (mapCanvas) mapCanvas.style.cursor = tool === 'pan' ? 'grab' : 'crosshair';
@@ -2824,9 +3078,48 @@ function toggleLayer(layer, on) {
 
 // ── SLAM Control ──────────────────────────────────────────────
 
+function applyMapMsg(msg) {
+  if (!mapLoadExpected) { console.log('[MAP] Ignored (no load requested yet)'); return; }
+  const dimChanged = (msg.info.width !== mapWidth || msg.info.height !== mapHeight);
+  mapResolution = msg.info.resolution;
+  mapWidth      = msg.info.width;
+  mapHeight     = msg.info.height;
+  mapOriginX    = msg.info.origin.position.x;
+  mapOriginY    = msg.info.origin.position.y;
+  occupancyData = new Int8Array(msg.data);
+  buildOccupancyCache();
+  if (dimChanged) fitMapToCanvas();
+  redrawMap();
+  document.getElementById('map-overlay-msg').style.display = 'none';
+}
+
+function startSlamMapPolling() {
+  console.log('[SLAM] Using live /map updates from rosbridge');
+  mapLoadExpected = true;
+  occupancyData = null;
+  occupancyCachedCanvas = null;
+  redrawMap();
+  const overlay = document.getElementById('map-overlay-msg');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function stopSlamMapPolling() {
+  console.log('[SLAM] Stopped live map view updates');
+}
+
 function listMaps() {
-  if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
-  topicSlamCmd.publish(new ROSLIB.Message({ data: 'list_maps' }));
+  console.log('[SLAM] listMaps() clicked', {
+    rosConnected,
+    hasRos: !!ros,
+    hasTopicSlamCmd: !!topicSlamCmd,
+    activeRobotCode,
+  });
+  if (!rosConnected) {
+    toast('Not connected to ROS', 'err');
+    return;
+  }
+  console.log('[SLAM] listMaps() — requesting via ROS topic');
+  requestSlamMapList();
 }
 
 function loadMap() {
@@ -2834,12 +3127,49 @@ function loadMap() {
   const sel = document.getElementById('slam-map-select');
   const mapname = sel.value;
   if (!mapname) { toast('Select a map first', 'err'); return; }
+
+  // Start a new guarded load request and clear stale visuals immediately.
+  mapLoadRequestToken += 1;
+  mapSwitchInProgress = true;
+  mapSwitchTargetName = mapname;
+  mapLoadExpected = true;
+  localizationReady = false;
+  localizationRequested = false;
+  initPosePending = false;
+  isDragging = false;
+  dragStart = null;
+  dragCurrent = null;
+  if (localizationWaitTimer) {
+    clearTimeout(localizationWaitTimer);
+    localizationWaitTimer = null;
+  }
+  occupancyData = null;
+  occupancyCachedCanvas = null;
+  lidarPoints = [];
+  globalPath = [];
+  redrawMap();
+
+  const overlay = document.getElementById('map-overlay-msg');
+  if (overlay) overlay.style.display = 'flex';
+  setMapListMeta('Loading map "' + mapname + '"…');
+
   topicSlamCmd.publish(new ROSLIB.Message({ data: 'load_map:' + mapname }));
   toast('Loading map "' + mapname + '"…');
+
+  // Wait for /map topic to deliver the newly loaded map.
+  if (mapSwitchTimeoutTimer) clearTimeout(mapSwitchTimeoutTimer);
+  const token = mapLoadRequestToken;
+  mapSwitchTimeoutTimer = setTimeout(() => {
+    if (!mapSwitchInProgress || token !== mapLoadRequestToken) return;
+    mapSwitchInProgress = false;
+    setMapListMeta('Timed out waiting for /map after loading "' + mapname + '"', true);
+    toast('Map switch timed out. Check Nav2/map_server status.', 'err');
+  }, 15000);
 }
 
 function stopNav() {
   if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
+  console.log('[SLAM] Sending command: stop_nav (current state:', slamState, ')');
   topicSlamCmd.publish(new ROSLIB.Message({ data: 'stop_nav' }));
   toast('Stopping navigation…');
 }
@@ -2847,34 +3177,133 @@ function stopNav() {
 function startSlam() {
   if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
   if (slamState === 'MAPPING') { toast('SLAM already running', 'err'); return; }
+  mapLoadExpected = true;
+  console.log('[SLAM] Sending command: start_slam');
   topicSlamCmd.publish(new ROSLIB.Message({ data: 'start_slam' }));
   toast('Starting SLAM…');
+  // Start live map view after a short startup delay
+  setTimeout(startSlamMapPolling, 3000);
 }
 
 function stopSlam() {
   if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
+  console.log('[SLAM] Sending command: stop_slam (current state:', slamState, ')');
+  stopSlamMapPolling();
   topicSlamCmd.publish(new ROSLIB.Message({ data: 'stop_slam' }));
   toast('Stopping SLAM…');
 }
 
 function saveMap() {
   if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
+  if (slamState !== 'MAPPING') { toast('Start SLAM first before saving', 'err'); return; }
   const name = document.getElementById('slam-map-name').value.trim();
   if (!name) { toast('Enter a map name', 'err'); return; }
+  console.log('[SLAM] Sending command: save_map:' + name, '(state:', slamState, ')');
   topicSlamCmd.publish(new ROSLIB.Message({ data: 'save_map:' + name }));
   toast('Saving map "' + name + '"…');
 }
 
-function populateMapList(jsonStr) {
-  let maps = [];
-  try { maps = JSON.parse(jsonStr); } catch(e) { return; }
+function setMapListMeta(text, isError = false) {
+  const el = document.getElementById('slam-map-list-meta');
+  if (!el) return;
+  el.textContent = text || '';
+  el.style.color = isError ? 'var(--red)' : 'var(--muted)';
+}
+
+function parseMapListPayload(payload) {
+  console.log('[SLAM] 🔍 parseMapListPayload() START - input:', payload);
+  const queue = [payload];
+  let depth = 0;
+  while (queue.length) {
+    const v = queue.shift();
+    depth++;
+    console.log(`[SLAM]   [depth ${depth}] value:`, v, 'type:', typeof v);
+    if (v == null) continue;
+
+    if (Array.isArray(v)) {
+      const result = v
+        .map(x => String(x ?? '').trim())
+        .filter(Boolean);
+      console.log('[SLAM] ✓ Found array result:', result);
+      return result;
+    }
+
+    if (typeof v === 'string') {
+      const s = v.trim();
+      if (!s) continue;
+      try {
+        console.log('[SLAM]   Trying JSON.parse on string:', s);
+        queue.push(JSON.parse(s));
+        continue;
+      } catch (e) {
+        console.log('[SLAM]   JSON.parse failed:', e.message, '- trying fallback parsing');
+        const cleaned = s.replace(/^\[/, '').replace(/\]$/, '');
+        const parts = cleaned.split(/[\n,]/)
+          .map(p => p.trim().replace(/^"|"$/g, '').replace(/^'|'$/g, ''))
+          .filter(Boolean);
+        if (parts.length) {
+          console.log('[SLAM] ✓ Found fallback result:', parts);
+          return parts;
+        }
+      }
+      continue;
+    }
+
+    if (typeof v === 'object') {
+      console.log('[SLAM]   Object detected. Keys:', Object.keys(v));
+      if (Array.isArray(v.maps)) {
+        const result = v.maps.map(x => String(x ?? '').trim()).filter(Boolean);
+        console.log('[SLAM] ✓ Found v.maps result:', result);
+        return result;
+      }
+      if (Array.isArray(v.list)) {
+        const result = v.list.map(x => String(x ?? '').trim()).filter(Boolean);
+        console.log('[SLAM] ✓ Found v.list result:', result);
+        return result;
+      }
+      if ('data' in v) {
+        console.log('[SLAM]   Found .data field, unwrapping...');
+        queue.push(v.data);
+      }
+      if ('msg' in v) {
+        console.log('[SLAM]   Found .msg field, unwrapping...');
+        queue.push(v.msg);
+      }
+      if ('value' in v) {
+        console.log('[SLAM]   Found .value field, unwrapping...');
+        queue.push(v.value);
+      }
+    }
+  }
+  console.log('[SLAM] ✗ parseMapListPayload() - No valid format found, returning []');
+  return [];
+}
+
+function populateMapList(rawPayload, source = '') {
+  console.log('[SLAM] 📝 populateMapList() START - source:', source);
+  const maps = parseMapListPayload(rawPayload);
+  console.log('[SLAM] 📝 parseMapListPayload returned:', maps, 'count:', maps.length);
+  mapListLoaded = true;
   const sel = document.getElementById('slam-map-select');
+  if (!sel) {
+    console.log('[SLAM] ✗ Select element #slam-map-select not found!');
+    return;
+  }
   const prev = sel.value;
+  console.log('[SLAM] 📝 Previous selection:', prev);
   sel.innerHTML = maps.length
     ? maps.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('')
-    : '<option value="">— no maps found —</option>';
+    : '<option value="">— no saved maps —</option>';
+  console.log('[SLAM] 📝 Dropdown updated with', maps.length, 'options');
   // Restore previous selection if still available
   if (prev && maps.includes(prev)) sel.value = prev;
+  if (maps.length) {
+    console.log('[SLAM] ✓ SUCCESS - Found', maps.length, 'map(s):', maps);
+    setMapListMeta((source ? source + ': ' : '') + maps.length + ' map(s) found');
+  } else {
+    console.log('[SLAM] ✗ No maps found');
+    setMapListMeta((source ? source + ': ' : '') + 'No saved maps received yet');
+  }
 }
 
 function updateSlamUI(state) {
@@ -2891,25 +3320,29 @@ function updateSlamUI(state) {
   const isSaving   = state === 'SAVING';
   const isNav      = state.startsWith('NAV:');
   const isLoading  = state.startsWith('LOADING:');
+  const isSaved    = state.startsWith('SAVED:');
+  const isError    = state.startsWith('ERROR:');
   const isBusy     = isSaving || isLoading;
+  // SLAM process may still be running during SAVING, SAVED, and ERROR states
+  const slamActive = isMapping || isSaving || isSaved || isError;
 
   // Badge
-  if (isMapping)                       { badge.textContent = 'MAPPING';    badge.className = 'ns-val nav'; }
-  else if (isLoading)                  { badge.textContent = 'LOADING';    badge.className = 'ns-val nav'; }
-  else if (isNav)                      { badge.textContent = 'NAVIGATING'; badge.className = 'ns-val ok'; }
-  else if (isSaving)                   { badge.textContent = 'SAVING';     badge.className = 'ns-val nav'; }
-  else if (state.startsWith('SAVED'))  { badge.textContent = 'SAVED';      badge.className = 'ns-val ok'; }
-  else if (state.startsWith('ERROR'))  { badge.textContent = 'ERROR';      badge.className = 'ns-val err'; }
-  else                                 { badge.textContent = 'IDLE';       badge.className = 'ns-val idle'; }
+  if (isMapping)        { badge.textContent = 'MAPPING';    badge.className = 'ns-val nav'; }
+  else if (isLoading)   { badge.textContent = 'LOADING';    badge.className = 'ns-val nav'; }
+  else if (isNav)       { badge.textContent = 'NAVIGATING'; badge.className = 'ns-val ok'; }
+  else if (isSaving)    { badge.textContent = 'SAVING';     badge.className = 'ns-val nav'; }
+  else if (isSaved)     { badge.textContent = 'SAVED';      badge.className = 'ns-val ok'; }
+  else if (isError)     { badge.textContent = 'ERROR';      badge.className = 'ns-val err'; }
+  else                  { badge.textContent = 'IDLE';       badge.className = 'ns-val idle'; }
 
   // SLAM buttons
-  startB.disabled = isMapping || isBusy || isNav || isLoading;
-  stopB.disabled  = !isMapping;
-  saveB.disabled  = !isMapping && !state.startsWith('SAVED');
+  startB.disabled = slamActive || isBusy || isNav || isLoading;
+  stopB.disabled  = !slamActive;   // enabled during MAPPING, SAVING, SAVED, ERROR
+  saveB.disabled  = !isMapping;    // only during active MAPPING
 
   // Navigation buttons
-  loadB.disabled  = isMapping || isBusy || isLoading;
-  stopNB.disabled = !isNav;
+  loadB.disabled  = slamActive || isBusy || isLoading;
+  stopNB.disabled = !isNav && !isLoading;
 
   // Disable nav auto-mode while SLAM is mapping
   const navMode = document.getElementById('amr-mode-auto');
@@ -2930,6 +3363,10 @@ function updateSlamUI(state) {
 function sendNavGoal(x, y, yaw) {
   if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
   if (amrMode !== 'auto') { toast('Switch to Auto Mode to navigate', 'err'); return; }
+  if (!localizationReady) {
+    toast('Localization not ready. Load map, then click Set Initial Pose.', 'err');
+    return;
+  }
 
   const qz = Math.sin(yaw / 2), qw = Math.cos(yaw / 2);
   topicGoal.publish(new ROSLIB.Message({
@@ -2972,21 +3409,58 @@ function updateNavStatus() {
   }
 }
 
-function setInitialPose() {
+function publishInitialPose(x, y, yaw) {
   if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
-  const pose = PRESETS[0];
-  const qz = Math.sin(pose.yaw/2), qw = Math.cos(pose.yaw/2);
+  if (!occupancyData) {
+    toast('Load map first before localizing', 'err');
+    return;
+  }
+
+  localizationReady = false;
+  localizationRequested = true;
+  if (localizationWaitTimer) clearTimeout(localizationWaitTimer);
+
+  const qz = Math.sin(yaw / 2), qw = Math.cos(yaw / 2);
   topicInitPose.publish(new ROSLIB.Message({
     header: { frame_id: 'map' },
     pose: {
       pose: {
-        position: { x: pose.x, y: pose.y, z: 0 },
+        position: { x, y, z: 0 },
         orientation: { x: 0, y: 0, z: qz, w: qw }
       },
-      covariance: [0.05,0,0,0,0,0, 0,0.05,0,0,0,0, 0,0,0,0,0,0, 0,0,0,0,0,0, 0,0,0,0,0,0, 0,0,0,0,0,0.05]
+      covariance: [0.25,0,0,0,0,0, 0,0.25,0,0,0,0, 0,0,0,0,0,0, 0,0,0,0,0,0, 0,0,0,0,0,0, 0,0,0,0,0,0.3]
     }
   }));
-  toast('Initial pose set at HOME', 'ok');
+
+  // Show the selected initial pose immediately so the UI behaves like RViz.
+  robotX = x;
+  robotY = y;
+  robotYaw = yaw;
+  updateIMUDisplay();
+  updateNavStatus();
+  redrawMap();
+
+  localizationWaitTimer = setTimeout(() => {
+    if (!localizationReady) {
+      localizationRequested = false;
+      toast('Localization timeout: AMCL pose not received yet.', 'err');
+    }
+  }, 12000);
+
+  toast('Initial pose sent. Waiting for AMCL localization…', 'ok');
+}
+
+function setInitialPose() {
+  if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
+  if (!occupancyData) {
+    toast('Load map first before localizing', 'err');
+    return;
+  }
+  initPosePending = false;
+  dragStart = null;
+  dragCurrent = null;
+  setTool('init');
+  toast('Click-drag on the map to set the initial pose like RViz', 'ok');
 }
 
 // ── Emergency stop ────────────────────────────────────────────
@@ -3137,10 +3611,146 @@ function advanceMission() {
   }
 }
 
+function shelfLabelFromCode(code) {
+  const s = String(code || '').trim();
+  if (!s) return 'Shelf';
+  const parts = s.split('_');
+  return parts[0] || s;
+}
+
+function updateDynamicWaypointsList() {
+  const list = document.getElementById('dynamic-waypoints-list');
+  if (!list) return;
+
+  if (!draftWaypoints.length && !squareWaypoints.length) {
+    list.innerHTML = `<div style="text-align:center;padding:12px;color:var(--muted);font-family:var(--mono);font-size:10px">No shelf points yet.</div>`;
+    return;
+  }
+
+  const draftHtml = draftWaypoints.map((wp, i) => `
+    <div class="wp-item" style="border-left:3px solid #3498db">
+      <div class="wp-num" style="background:#3498db">D${i + 1}</div>
+      <div class="wp-coords">Draft · X ${wp.x.toFixed(2)} · Y ${wp.y.toFixed(2)}</div>
+      <button class="wp-del" onclick="draftWaypoints.splice(${i},1);updateDynamicWaypointsList();redrawMap()" title="Remove draft">✕</button>
+    </div>
+  `).join('');
+
+  const savedHtml = squareWaypoints.map((wp, i) => `
+    <div class="wp-item" style="border-left:3px solid #8e44ad">
+      <div class="wp-num" style="background:#8e44ad">S${i + 1}</div>
+      <div class="wp-coords">${esc(wp.name || 'Shelf')} · X ${wp.x.toFixed(2)} · Y ${wp.y.toFixed(2)}</div>
+      <div style="margin-left:auto;font-size:10px;color:var(--muted)">DB</div>
+    </div>
+  `).join('');
+
+  list.innerHTML = `${draftHtml}${savedHtml}`;
+}
+
+function syncSavedShelfWaypoints(locations) {
+  const next = (locations || [])
+    .filter(l => l.loc_x != null && l.loc_y != null)
+    .map(l => ({
+      id: l.id,
+      x: Number(l.loc_x),
+      y: Number(l.loc_y),
+      yaw: l.loc_yaw != null ? Number(l.loc_yaw) : 0,
+      name: shelfLabelFromCode(l.location_code),
+      code: l.location_code,
+    }));
+  squareWaypoints = next;
+  updateDynamicWaypointsList();
+  redrawMap();
+}
+
+function toggleMultiWaypointMode() {
+  isMultiWpMode = !isMultiWpMode;
+  const btn = document.getElementById('btn-multi-wp');
+  if (btn) {
+    btn.textContent = isMultiWpMode ? '📍 Point Mode: ON (Click map)' : '📍 1. Enable Point Mode';
+    btn.classList.toggle('amr-btn-green', isMultiWpMode);
+    btn.classList.toggle('amr-btn-ghost', !isMultiWpMode);
+  }
+  if (isMultiWpMode && activeTool !== 'pan') {
+    setTool('pan');
+  }
+  toast(isMultiWpMode ? 'Shelf point mode enabled' : 'Shelf point mode disabled', 'ok');
+}
+
+function clearDraftPoints() {
+  draftWaypoints = [];
+  updateDynamicWaypointsList();
+  redrawMap();
+}
+
+async function saveAllDraftWaypoints() {
+  if (!draftWaypoints.length) {
+    toast('No draft shelf points to save', 'err');
+    return;
+  }
+
+  const baseName = (prompt('Shelf code prefix (example: SHELF_A)') || '').trim().toUpperCase();
+  if (!baseName) {
+    toast('Save cancelled: shelf code prefix required', 'err');
+    return;
+  }
+
+  try {
+    const startIdx = _locations.length + 1;
+    for (let i = 0; i < draftWaypoints.length; i++) {
+      const wp = draftWaypoints[i];
+      const code = `${baseName}_${String(startIdx + i).padStart(2, '0')}`;
+      await api('/locations', {
+        method: 'POST',
+        body: JSON.stringify({
+          location_code: code,
+          rack: baseName,
+          slot: String(startIdx + i).padStart(2, '0'),
+          loc_x: wp.x,
+          loc_y: wp.y,
+          loc_yaw: wp.yaw || 0,
+        }),
+      });
+    }
+    draftWaypoints = [];
+    await loadCrud();
+    toast('Shelf points saved to Locations', 'ok');
+  } catch (e) {
+    console.error(e);
+    toast('Failed to save shelf points: ' + e.message, 'err');
+  }
+}
+
+async function clearAllSavedWaypoints() {
+  if (!squareWaypoints.length) {
+    clearDraftPoints();
+    return;
+  }
+
+  const ok = confirm('Delete all saved shelf locations that contain map coordinates? This cannot be undone.');
+  if (!ok) return;
+
+  try {
+    for (const wp of squareWaypoints) {
+      await api(`/locations/${wp.id}`, { method: 'DELETE' });
+    }
+    draftWaypoints = [];
+    squareWaypoints = [];
+    await loadCrud();
+    toast('Saved shelf locations removed', 'ok');
+  } catch (e) {
+    console.error(e);
+    toast('Failed to clear saved shelves: ' + e.message, 'err');
+  }
+}
+
 // ── Preset nav buttons ────────────────────────────────────────
 
 function buildPresets() {
   const list = document.getElementById('preset-list');
+  if (!PRESETS.length) {
+    list.innerHTML = `<div style="text-align:center;padding:10px;color:var(--muted);font-family:var(--mono);font-size:10px">No fixed presets. Use saved runtime points.</div>`;
+    return;
+  }
   list.innerHTML = PRESETS.map((p, i) => `
     <div class="wp-preset" onclick="sendNavGoal(${p.x},${p.y},${p.yaw})">
       <div class="wp-preset-dot" style="background:${p.color}"></div>

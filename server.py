@@ -1,10 +1,16 @@
 """
-Warehouse AMR Dashboard — FastAPI Backend v3
+Warehouse AMR Dashboard — FastAPI Backend v5
 ============================================
-NEW in v3:
-  - WebSocket endpoint /ws
-  - POST /scan now fetches the full joined record (Robot + Location + Product + Qty)
-    and broadcasts it to ALL connected dashboard clients instantly.
+NEW in v5:
+  - Cloud Bridge: Pi agent connects outbound → server relays to dashboard
+    No port forwarding or LAN required on the Pi side.
+  - /ws/robot-agent/{code}  — Pi bridge agent connects here
+  - /robot-agents           — list which robots have cloud agents online
+
+v4 features (retained):
+  - /ros-proxy   WebSocket proxy → Pi rosbridge (LAN) or cloud bridge (Internet)
+  - /camera-proxy HTTP proxy     → relays Pi MJPEG stream (port 5000)
+  - All browser traffic now goes through THIS server only (port 8000).
 
 Tables:   Robots · Locations · Products · Inventory · ScanLogs
 CRUD:
@@ -17,6 +23,10 @@ Real-time:
   POST   /scan           — robot scan  →  saves + broadcasts via WebSocket
   WS     /ws             — dashboard connects here to receive live pushes
 
+Proxy:
+  WS     /ros-proxy?robot=AMR_01   — proxies rosbridge WebSocket
+  GET    /camera-proxy?robot=AMR_01 — proxies MJPEG camera stream
+
 Utility:
   GET    /health
   GET    /               — serves index.html
@@ -27,11 +37,14 @@ Run:
 
 import os
 import json
+import asyncio
 import pyodbc
+import httpx
+import websockets
 from datetime import datetime
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List
 import math
@@ -98,8 +111,17 @@ def init_db():
                id INT IDENTITY(1,1) PRIMARY KEY,
                location_code NVARCHAR(50) NOT NULL,
                rack NVARCHAR(50),
-               slot NVARCHAR(50)
+                    slot NVARCHAR(50),
+                    loc_x FLOAT,
+                    loc_y FLOAT,
+                    loc_yaw FLOAT
            )""",
+        """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Locations' AND COLUMN_NAME='loc_x')
+              ALTER TABLE Locations ADD loc_x FLOAT""",
+        """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Locations' AND COLUMN_NAME='loc_y')
+              ALTER TABLE Locations ADD loc_y FLOAT""",
+        """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Locations' AND COLUMN_NAME='loc_yaw')
+              ALTER TABLE Locations ADD loc_yaw FLOAT""",
         """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='Products')
            CREATE TABLE Products (
                id INT IDENTITY(1,1) PRIMARY KEY,
@@ -416,12 +438,18 @@ class LocationCreate(BaseModel):
     location_code: str
     rack: Optional[str] = None
     slot: Optional[str] = None
+    loc_x: Optional[float] = None
+    loc_y: Optional[float] = None
+    loc_yaw: Optional[float] = None
 
 
 class LocationUpdate(BaseModel):
     location_code: Optional[str] = None
     rack: Optional[str] = None
     slot: Optional[str] = None
+    loc_x: Optional[float] = None
+    loc_y: Optional[float] = None
+    loc_yaw: Optional[float] = None
 
 
 class ProductCreate(BaseModel):
@@ -596,10 +624,13 @@ def create_location(b: LocationCreate):
     with get_connection() as conn:
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO Locations (location_code, rack, slot) VALUES (?,?,?)",
+            "INSERT INTO Locations (location_code, rack, slot, loc_x, loc_y, loc_yaw) VALUES (?,?,?,?,?,?)",
             b.location_code,
             b.rack,
             b.slot,
+            b.loc_x,
+            b.loc_y,
+            b.loc_yaw,
         )
         conn.commit()
     return {"status": "created"}
@@ -617,6 +648,15 @@ def update_location(lid: int, b: LocationUpdate):
     if b.slot is not None:
         f.append("slot=?")
         v.append(b.slot)
+    if b.loc_x is not None:
+        f.append("loc_x=?")
+        v.append(b.loc_x)
+    if b.loc_y is not None:
+        f.append("loc_y=?")
+        v.append(b.loc_y)
+    if b.loc_yaw is not None:
+        f.append("loc_yaw=?")
+        v.append(b.loc_yaw)
     if not f:
         raise HTTPException(400, "No fields")
     v.append(lid)
@@ -1218,6 +1258,283 @@ def delete_order(oid: int):
             raise HTTPException(404, "Not found")
         conn.commit()
     return {"status": "deleted"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLOUD BRIDGE — Pi agent connects outbound to server for internet control
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Optional shared secret: set BRIDGE_TOKEN env-var on both server and Pi.
+# If unset, any client can register as a robot agent (fine for local dev).
+BRIDGE_TOKEN = os.environ.get("BRIDGE_TOKEN", "")
+
+
+class RobotBridge:
+    """Hub linking ONE Pi agent WebSocket to N dashboard relay sockets for a robot."""
+
+    def __init__(self, robot_code: str):
+        self.robot_code = robot_code
+        self.agent_ws: WebSocket | None = None
+        self.dashboard_clients: list[WebSocket] = []
+
+    async def forward_to_dashboards(self, data: str):
+        """Send a message from the Pi agent to every connected dashboard client."""
+        dead: list[WebSocket] = []
+        for ws in self.dashboard_clients:
+            try:
+                await ws.send_text(data)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self.dashboard_clients.remove(ws)
+
+    async def forward_to_agent(self, data: str):
+        """Send a message from a dashboard client to the Pi agent."""
+        if self.agent_ws:
+            try:
+                await self.agent_ws.send_text(data)
+            except Exception:
+                self.agent_ws = None
+
+
+# Global registry: robot_code → RobotBridge
+_robot_bridges: dict[str, RobotBridge] = {}
+
+
+def _get_bridge(code: str) -> RobotBridge:
+    if code not in _robot_bridges:
+        _robot_bridges[code] = RobotBridge(code)
+    return _robot_bridges[code]
+
+
+@app.websocket("/ws/robot-agent/{robot_code}")
+async def robot_agent_endpoint(ws: WebSocket, robot_code: str, token: str = Query("")):
+    """
+    **Pi bridge agent** connects here (outbound from Pi → server).
+
+    The agent simultaneously connects to local rosbridge (ws://localhost:9090)
+    and this endpoint. It relays rosbridge traffic in both directions so the
+    dashboard's /ros-proxy can reach the robot over the internet.
+
+    Query params:
+      ?token=<BRIDGE_TOKEN>   (required only when BRIDGE_TOKEN env-var is set)
+    """
+    # ── Auth ──
+    if BRIDGE_TOKEN and token != BRIDGE_TOKEN:
+        await ws.close(code=1008, reason="Invalid bridge token")
+        return
+
+    bridge = _get_bridge(robot_code)
+
+    # Only one agent per robot at a time
+    if bridge.agent_ws is not None:
+        await ws.close(code=1008, reason=f"Agent already connected for {robot_code}")
+        return
+
+    await ws.accept()
+    bridge.agent_ws = ws
+    print(f"[CLOUD] Pi agent CONNECTED for {robot_code}")
+
+    try:
+        while True:
+            data = await ws.receive_text()
+            # Relay rosbridge response from Pi → all dashboard clients
+            await bridge.forward_to_dashboards(data)
+    except WebSocketDisconnect:
+        pass
+    except Exception as exc:
+        print(f"[CLOUD] Agent error for {robot_code}: {exc}")
+    finally:
+        bridge.agent_ws = None
+        print(f"[CLOUD] Pi agent DISCONNECTED for {robot_code}")
+
+
+@app.get("/robot-agents", tags=["Cloud Bridge"])
+async def list_robot_agents():
+    """Return which robots currently have a cloud bridge agent connected."""
+    return {
+        code: bridge.agent_ws is not None for code, bridge in _robot_bridges.items()
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROXY — Centralise ROS Bridge + Camera through this server
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Allowed ports that the proxy may connect to on robot hosts.
+_ALLOWED_PROXY_PORTS = {9090, 5000}
+
+
+def _resolve_robot_ip(robot_code: str) -> str:
+    """Look up a robot's IP address from the Robots table. Raises HTTPException on failure."""
+    if not robot_code:
+        raise HTTPException(400, "Missing robot code")
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT ip_address FROM Robots WHERE robot_code=?", robot_code)
+        row = cur.fetchone()
+    if not row or not row[0]:
+        raise HTTPException(404, f"Robot '{robot_code}' not found or has no IP address")
+    return row[0]
+
+
+@app.websocket("/ros-proxy")
+async def ros_bridge_proxy(ws_client: WebSocket, robot: str = Query(...)):
+    """
+    Bidirectional WebSocket proxy: browser ↔ server ↔ Pi rosbridge.
+
+    Two modes (automatic):
+      1. **Cloud Bridge** — if a Pi agent is connected via /ws/robot-agent/{code},
+         relay through it.  Works over the internet.
+      2. **LAN Direct**  — otherwise, open a direct WebSocket to ws://<ip>:9090.
+
+    Query parameter: ?robot=AMR_01
+    """
+
+    def _log_debug_publish_frame(raw: str):
+        """Log selected publish frames for quick debugging."""
+        try:
+            obj = json.loads(raw)
+        except Exception:
+            return
+        if obj.get("op") != "publish":
+            return
+        topic = obj.get("topic")
+        msg = obj.get("msg") or {}
+        if topic == "/slam/command":
+            payload = msg.get("data")
+            print(f"[ROS-PROXY] TX /slam/command ({robot}) -> {payload}")
+            return
+        if topic == "/cmd_vel":
+            lin = (msg.get("linear") or {}).get("x")
+            ang = (msg.get("angular") or {}).get("z")
+            print(
+                f"[ROS-PROXY] TX /cmd_vel ({robot}) -> linear.x={lin}, angular.z={ang}"
+            )
+
+    # ── Try Cloud Bridge first ────────────────────────────────────────────
+    bridge = _robot_bridges.get(robot)
+    if bridge and bridge.agent_ws is not None:
+        await ws_client.accept()
+        bridge.dashboard_clients.append(ws_client)
+        print(
+            f"[ROS-PROXY] Cloud bridge for {robot} (dashboards: {len(bridge.dashboard_clients)})"
+        )
+        try:
+            while True:
+                data = await ws_client.receive_text()
+                _log_debug_publish_frame(data)
+                await bridge.forward_to_agent(data)
+        except WebSocketDisconnect:
+            pass
+        except Exception as exc:
+            print(f"[ROS-PROXY] Cloud relay error for {robot}: {exc}")
+        finally:
+            if ws_client in bridge.dashboard_clients:
+                bridge.dashboard_clients.remove(ws_client)
+            print(f"[ROS-PROXY] Cloud session ended for {robot}")
+        return
+
+    # ── Fall back to LAN direct connection ────────────────────────────────
+    try:
+        ip = _resolve_robot_ip(robot)
+    except HTTPException:
+        await ws_client.close(code=1008, reason=f"Robot '{robot}' not found or no IP")
+        return
+
+    ros_url = f"ws://{ip}:9090"
+    await ws_client.accept()
+    print(f"[ROS-PROXY] LAN direct for {robot} → {ros_url}")
+
+    try:
+        async with websockets.connect(ros_url, max_size=16 * 1024 * 1024) as ws_ros:
+
+            async def browser_to_ros():
+                """Forward messages from the browser to rosbridge."""
+                try:
+                    while True:
+                        data = await ws_client.receive_text()
+                        _log_debug_publish_frame(data)
+                        await ws_ros.send(data)
+                except WebSocketDisconnect:
+                    pass
+                except Exception:
+                    pass
+
+            async def ros_to_browser():
+                """Forward messages from rosbridge to the browser."""
+                try:
+                    async for message in ws_ros:
+                        if isinstance(message, str):
+                            await ws_client.send_text(message)
+                        else:
+                            await ws_client.send_bytes(message)
+                except websockets.ConnectionClosed:
+                    pass
+                except Exception:
+                    pass
+
+            # Run both relay directions concurrently; stop when either side closes.
+            done, pending = await asyncio.wait(
+                [
+                    asyncio.create_task(browser_to_ros()),
+                    asyncio.create_task(ros_to_browser()),
+                ],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
+
+    except (OSError, websockets.InvalidURI, websockets.InvalidHandshake) as exc:
+        print(f"[ROS-PROXY] Cannot reach rosbridge at {ros_url}: {exc}")
+        try:
+            await ws_client.close(
+                code=1011, reason=f"Cannot reach rosbridge: {exc}"[:120]
+            )
+        except Exception:
+            pass
+    except Exception as exc:
+        print(f"[ROS-PROXY] Unexpected error: {exc}")
+        try:
+            await ws_client.close(code=1011, reason="Internal proxy error")
+        except Exception:
+            pass
+    finally:
+        print(f"[ROS-PROXY] Session ended for robot '{robot}'")
+
+
+@app.get("/camera-proxy", tags=["Proxy"])
+async def camera_stream_proxy(robot: str = Query(...)):
+    """
+    Proxy the MJPEG camera stream from a robot's Pi (port 5000).
+
+    The dashboard loads this URL in an <img> tag instead of hitting the Pi directly.
+    Query parameter: ?robot=AMR_01
+    """
+    ip = _resolve_robot_ip(robot)
+    camera_url = f"http://{ip}:5000/video"
+
+    async def _stream():
+        try:
+            async with httpx.AsyncClient() as client:
+                async with client.stream(
+                    "GET",
+                    camera_url,
+                    timeout=httpx.Timeout(connect=5.0, read=None, write=5.0, pool=5.0),
+                ) as resp:
+                    if resp.status_code != 200:
+                        return
+                    async for chunk in resp.aiter_bytes(chunk_size=8192):
+                        yield chunk
+        except (httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout) as exc:
+            print(f"[CAM-PROXY] Cannot reach camera at {camera_url}: {exc}")
+        except Exception as exc:
+            print(f"[CAM-PROXY] Stream error: {exc}")
+
+    return StreamingResponse(
+        _stream(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
