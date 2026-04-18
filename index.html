@@ -1026,7 +1026,6 @@ select option{background:var(--surface)}
     <div class="panel-header">
       <div class="panel-title">Pick Orders</div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-ghost btn-sm" onclick="seedDemo()">🌱 Seed Demo Data</button>
         <button class="btn btn-primary btn-sm" onclick="openCreateOrder()">+ New Order</button>
       </div>
     </div>
@@ -1519,6 +1518,7 @@ let feed       = [];          // array of enriched scan objects (max 20)
 let _products  = [];
 let _locations = [];
 let _robots    = [];
+let editCache  = { robots:{}, locations:{}, products:{}, inventory:{} };
 let modalCtx   = {};
 let ws         = null;
 
@@ -1701,67 +1701,83 @@ async function loadCrud() {
 function renderRobots(data) {
   setCount('cnt-robots', data.length);
   const tb = document.getElementById('body-robots');
+  editCache.robots = {};
   if (!data.length) { emptyRow(tb, 7); return; }
   const stCls = s => s === 'IDLE' ? 'COMPLETED' : s === 'BUSY' ? 'IN_PROGRESS' : 'PENDING';
-  tb.innerHTML = data.map(r => `<tr>
-    <td class="id">${esc(r.id)}</td>
-    <td class="code">${esc(r.robot_code)}</td>
-    <td>${esc(r.description??'—')}</td>
-    <td><span class="order-status ${stCls(r.status)}">${esc(r.status??'IDLE')}</span></td>
-    <td style="font-family:var(--mono);font-size:11px">${esc(r.ip_address??'—')}</td>
-    <td style="font-size:11px;font-family:var(--mono)">${r.home_x != null ? Number(r.home_x).toFixed(3) : '—'}, ${r.home_y != null ? Number(r.home_y).toFixed(3) : '—'}</td>
-    <td class="acts">
-      <button class="btn btn-ghost btn-sm" onclick='openEdit("robots",${r.id},${jq(r)})'>Edit</button>
-      <button class="btn btn-danger btn-sm" onclick='confirmDel("robots",${r.id},"${esc(r.robot_code)}")'>Del</button>
-    </td></tr>`).join('');
+  tb.innerHTML = data.map(r => {
+    editCache.robots[r.id] = r;
+    return `<tr>
+      <td class="id">${esc(r.id)}</td>
+      <td class="code">${esc(r.robot_code)}</td>
+      <td>${esc(r.description??'—')}</td>
+      <td><span class="order-status ${stCls(r.status)}">${esc(r.status??'IDLE')}</span></td>
+      <td style="font-family:var(--mono);font-size:11px">${esc(r.ip_address??'—')}</td>
+      <td style="font-size:11px;font-family:var(--mono)">${r.home_x != null ? Number(r.home_x).toFixed(3) : '—'}, ${r.home_y != null ? Number(r.home_y).toFixed(3) : '—'}</td>
+      <td class="acts">
+        <button class="btn btn-ghost btn-sm" onclick="openEdit('robots',${r.id})">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDel('robots',${r.id},'${esc(r.robot_code)}')">Del</button>
+      </td></tr>`;
+  }).join('');
 }
 
 function renderLocations(data) {
   setCount('cnt-locations', data.length);
   const tb = document.getElementById('body-locations');
+  editCache.locations = {};
   syncSavedShelfWaypoints(data);
   if (!data.length) { emptyRow(tb, 6); return; }
-  tb.innerHTML = data.map(r => `<tr>
-    <td class="id">${esc(r.id)}</td>
-    <td class="code">${esc(r.location_code)}</td>
-    <td>${esc(r.rack??'—')}</td>
-    <td>${esc(r.slot??'—')}</td>
-    <td style="font-family:var(--mono);font-size:11px">${r.loc_x != null ? Number(r.loc_x).toFixed(3) : '—'}, ${r.loc_y != null ? Number(r.loc_y).toFixed(3) : '—'}, ${r.loc_yaw != null ? Number(r.loc_yaw).toFixed(2) : '—'}</td>
-    <td class="acts">
-      <button class="btn btn-ghost btn-sm" onclick='openEdit("locations",${r.id},${jq(r)})'>Edit</button>
-      <button class="btn btn-danger btn-sm" onclick='confirmDel("locations",${r.id},"${esc(r.location_code)}")'>Del</button>
-    </td></tr>`).join('');
+  tb.innerHTML = data.map(r => {
+    editCache.locations[r.id] = r;
+    return `<tr>
+      <td class="id">${esc(r.id)}</td>
+      <td class="code">${esc(r.location_code)}</td>
+      <td>${esc(r.rack??'—')}</td>
+      <td>${esc(r.slot??'—')}</td>
+      <td style="font-family:var(--mono);font-size:11px">${r.loc_x != null ? Number(r.loc_x).toFixed(3) : '—'}, ${r.loc_y != null ? Number(r.loc_y).toFixed(3) : '—'}, ${r.loc_yaw != null ? Number(r.loc_yaw).toFixed(2) : '—'}</td>
+      <td class="acts">
+        <button class="btn btn-ghost btn-sm" onclick="openEdit('locations',${r.id})">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDel('locations',${r.id},'${esc(r.location_code)}')">Del</button>
+      </td></tr>`;
+  }).join('');
 }
 
 function renderProducts(data) {
   setCount('cnt-products', data.length);
   const tb = document.getElementById('body-products');
+  editCache.products = {};
   if (!data.length) { emptyRow(tb, 5); return; }
-  tb.innerHTML = data.map(r => `<tr>
-    <td class="id">${esc(r.id)}</td>
-    <td class="code">${esc(r.product_code)}</td>
-    <td>${esc(r.name??'—')}</td>
-    <td>${esc(r.category??'—')}</td>
-    <td class="acts">
-      <button class="btn btn-ghost btn-sm" onclick='openEdit("products",${r.id},${jq(r)})'>Edit</button>
-      <button class="btn btn-danger btn-sm" onclick='confirmDel("products",${r.id},"${esc(r.product_code)}")'>Del</button>
-    </td></tr>`).join('');
+  tb.innerHTML = data.map(r => {
+    editCache.products[r.id] = r;
+    return `<tr>
+      <td class="id">${esc(r.id)}</td>
+      <td class="code">${esc(r.product_code)}</td>
+      <td>${esc(r.name??'—')}</td>
+      <td>${esc(r.category??'—')}</td>
+      <td class="acts">
+        <button class="btn btn-ghost btn-sm" onclick="openEdit('products',${r.id})">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDel('products',${r.id},'${esc(r.product_code)}')">Del</button>
+      </td></tr>`;
+  }).join('');
 }
 
 function renderInventory(data) {
   setCount('cnt-inventory', data.length);
   const tb = document.getElementById('body-inventory');
+  editCache.inventory = {};
   if (!data.length) { emptyRow(tb, 6); return; }
-  tb.innerHTML = data.map(r => `<tr>
-    <td class="id">${esc(r.id)}</td>
-    <td class="code">${esc(r.product_code??'—')} <small style="color:var(--muted)">${esc(r.product_name??'')}</small></td>
-    <td>${esc(r.location_code??'—')}</td>
-    <td style="color:var(--muted)">${esc(r.rack??'')}/${esc(r.slot??'')}</td>
-    <td class="qty">${esc(r.quantity)}</td>
-    <td class="acts">
-      <button class="btn btn-ghost btn-sm" onclick='openEdit("inventory",${r.id},${jq(r)})'>Edit</button>
-      <button class="btn btn-danger btn-sm" onclick='confirmDel("inventory",${r.id},"inventory #${r.id}")'>Del</button>
-    </td></tr>`).join('');
+  tb.innerHTML = data.map(r => {
+    editCache.inventory[r.id] = r;
+    return `<tr>
+      <td class="id">${esc(r.id)}</td>
+      <td class="code">${esc(r.product_code??'—')} <small style="color:var(--muted)">${esc(r.product_name??'')}</small></td>
+      <td>${esc(r.location_code??'—')}</td>
+      <td style="color:var(--muted)">${esc(r.rack??'')}/${esc(r.slot??'')}</td>
+      <td class="qty">${esc(r.quantity)}</td>
+      <td class="acts">
+        <button class="btn btn-ghost btn-sm" onclick="openEdit('inventory',${r.id})">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDel('inventory',${r.id},'inventory #${r.id}')">Del</button>
+      </td></tr>`;
+  }).join('');
 }
 
 function renderScanlogs(data) {
@@ -1837,6 +1853,8 @@ function openAdd(table) {
 }
 
 function openEdit(table, id, row) {
+  row = row || editCache[table]?.[id];
+  if (!row) { toast('Unable to load record for edit', 'err'); return; }
   modalCtx = { table, mode: 'edit', id };
   document.getElementById('modal-title').textContent = 'Edit — ' + table + ' #' + id;
   document.getElementById('modal-body').innerHTML = FORMS[table]();
@@ -1915,7 +1933,7 @@ document.addEventListener('keydown', e => {
 
 /* ── Helpers ───────────────────────────────────────────────── */
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function jq(r) { return JSON.stringify(r).replace(/"/g,"'"); }
+function jq(r) { return JSON.stringify(r).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"'); }
 
 let toastT;
 function toast(msg, type='ok') {
@@ -2164,11 +2182,16 @@ let robotX = null, robotY = null, robotYaw = null;
 // Goal state
 let goalX = null, goalY = null;
 let goalInitX = null;              // goal origin for distance calc
+let goalInitY = null;              // goal origin for distance calc
 let navState = 'IDLE';             // IDLE | NAVIGATING | SUCCESS | FAILED
 let localizationReady = false;
 let localizationRequested = false;
 let localizationWaitTimer = null;
 let initPosePending = false;
+let initialPoseUiLock = false;
+let pendingInitialPose = null;     // {x,y,yaw,requestedAt}
+let expectedUiCmdVelUntil = 0;
+let lastExternalCmdVelWarnAt = 0;
 
 // Trajectory history
 let poseHistory = [];
@@ -2380,6 +2403,24 @@ function setupTopics() {
   topicCmdVel = new ROSLIB.Topic({ ros, name: '/cmd_vel', messageType: 'geometry_msgs/Twist' });
   topicCmdVel.advertise();
 
+  // Monitor robot motion commands to detect movement initiated outside the UI.
+  const cmdVelMonitor = new ROSLIB.Topic({ ros, name: '/cmd_vel', messageType: 'geometry_msgs/Twist' });
+  cmdVelMonitor.subscribe(msg => {
+    const lin = Math.abs(msg?.linear?.x ?? 0);
+    const ang = Math.abs(msg?.angular?.z ?? 0);
+    if (lin < 0.01 && ang < 0.01) return;
+
+    const now = Date.now();
+    const uiExpected = now <= expectedUiCmdVelUntil;
+    const navExpected = navState === 'NAVIGATING' || missionActive;
+
+    if (!uiExpected && !navExpected && (now - lastExternalCmdVelWarnAt > 3500)) {
+      lastExternalCmdVelWarnAt = now;
+      toast('Motion command detected from ROS side (not from this UI). Check Pi/nav nodes.', 'err');
+      console.warn('[AMR] External /cmd_vel detected:', msg);
+    }
+  });
+
   // goal_pose
   topicGoal = new ROSLIB.Topic({ ros, name: '/goal_pose', messageType: 'geometry_msgs/PoseStamped' });
   topicGoal.advertise();
@@ -2395,11 +2436,29 @@ function setupTopics() {
   // ── amcl_pose → robot position + history
   const poseTopic = new ROSLIB.Topic({ ros, name: '/amcl_pose', messageType: 'geometry_msgs/PoseWithCovarianceStamped' });
   poseTopic.subscribe(msg => {
-    robotX = msg.pose.pose.position.x;
-    robotY = msg.pose.pose.position.y;
+    const nextX = msg.pose.pose.position.x;
+    const nextY = msg.pose.pose.position.y;
     const qz = msg.pose.pose.orientation.z;
     const qw = msg.pose.pose.orientation.w;
-    robotYaw = 2 * Math.atan2(qz, qw);
+    const nextYaw = 2 * Math.atan2(qz, qw);
+
+    // Right after publishing /initialpose, AMCL may briefly emit stale pose samples.
+    // Keep the marker stable until AMCL converges near the requested initial pose.
+    if (localizationRequested && pendingInitialPose) {
+      const dt = Date.now() - pendingInitialPose.requestedAt;
+      const distToRequested = Math.hypot(nextX - pendingInitialPose.x, nextY - pendingInitialPose.y);
+      if (distToRequested > 1.0 && dt < 6000) {
+        return;
+      }
+    }
+
+    if (initialPoseUiLock && activeTool === 'init') {
+      return;
+    }
+
+    robotX = nextX;
+    robotY = nextY;
+    robotYaw = nextYaw;
 
     // Trajectory history
     if (histVisible) {
@@ -2409,11 +2468,14 @@ function setupTopics() {
 
     updateIMUDisplay();
     updateNavStatus();
+
     redrawMap();
 
     if (localizationRequested) {
       localizationRequested = false;
       localizationReady = true;
+      initialPoseUiLock = false;
+      pendingInitialPose = null;
       if (localizationWaitTimer) {
         clearTimeout(localizationWaitTimer);
         localizationWaitTimer = null;
@@ -3054,6 +3116,9 @@ function mapZoom(factor, about) {
 function mapResetView() { fitMapToCanvas(); redrawMap(); }
 
 function setTool(tool) {
+  if (activeTool === 'init' && tool !== 'init' && !localizationRequested) {
+    initialPoseUiLock = false;
+  }
   activeTool = tool;
   ['nav','wp','pan','init'].forEach(t => {
     const btn = document.getElementById('tool-' + t);
@@ -3379,6 +3444,7 @@ function sendNavGoal(x, y, yaw) {
 
   goalX = x; goalY = y;
   goalInitX = robotX; // for progress calc
+  goalInitY = robotY; // for progress calc
   setNavState('NAVIGATING');
   document.getElementById('ns-gx').textContent = x.toFixed(3);
   document.getElementById('ns-gy').textContent = y.toFixed(3);
@@ -3401,9 +3467,9 @@ function updateNavStatus() {
     const dist = Math.sqrt((goalX-robotX)**2 + (goalY-robotY)**2);
     document.getElementById('ns-dist').textContent = dist.toFixed(2) + ' m';
     // Simple progress: % of initial distance covered
-    if (goalInitX !== null) {
-      const initDist = Math.sqrt((goalX-goalInitX)**2 + (goalY-(goalY))**2) || dist;
-      const prog = Math.max(0, Math.min(100, (1 - dist / Math.max(dist, 0.01)) * 100));
+    if (goalInitX !== null && goalInitY !== null) {
+      const initDist = Math.sqrt((goalX-goalInitX)**2 + (goalY-goalInitY)**2) || dist;
+      const prog = Math.max(0, Math.min(100, (1 - dist / Math.max(initDist, 0.01)) * 100));
       document.getElementById('ns-prog').textContent = prog.toFixed(0) + '%';
     }
   }
@@ -3418,6 +3484,8 @@ function publishInitialPose(x, y, yaw) {
 
   localizationReady = false;
   localizationRequested = true;
+  initialPoseUiLock = true;
+  pendingInitialPose = { x, y, yaw, requestedAt: Date.now() };
   if (localizationWaitTimer) clearTimeout(localizationWaitTimer);
 
   const qz = Math.sin(yaw / 2), qw = Math.cos(yaw / 2);
@@ -3432,17 +3500,15 @@ function publishInitialPose(x, y, yaw) {
     }
   }));
 
-  // Show the selected initial pose immediately so the UI behaves like RViz.
-  robotX = x;
-  robotY = y;
-  robotYaw = yaw;
-  updateIMUDisplay();
+  // Do not override the robot position in the UI until AMCL publishes the new pose.
   updateNavStatus();
   redrawMap();
 
   localizationWaitTimer = setTimeout(() => {
     if (!localizationReady) {
       localizationRequested = false;
+      initialPoseUiLock = false;
+      pendingInitialPose = null;
       toast('Localization timeout: AMCL pose not received yet.', 'err');
     }
   }, 12000);
@@ -3457,6 +3523,7 @@ function setInitialPose() {
     return;
   }
   initPosePending = false;
+  initialPoseUiLock = true;
   dragStart = null;
   dragCurrent = null;
   setTool('init');
@@ -3475,6 +3542,7 @@ function emergencyStop() {
 
   if (rosConnected) {
     const zero = new ROSLIB.Message({ linear:{x:0,y:0,z:0}, angular:{x:0,y:0,z:0} });
+    expectedUiCmdVelUntil = Date.now() + 1500;
     for (let i = 0; i < 5; i++) setTimeout(() => topicCmdVel.publish(zero), i * 50);
   }
   toast('⛔ EMERGENCY STOP — Robot halted', 'err');
@@ -3492,6 +3560,7 @@ function teleopStart(linDir, angDir) {
   teleopAngular = ang * angDir;
   if (teleopInterval) clearInterval(teleopInterval);
   teleopInterval = setInterval(() => {
+    expectedUiCmdVelUntil = Date.now() + 400;
     topicCmdVel.publish(new ROSLIB.Message({
       linear:  { x: teleopLinear,  y: 0, z: 0 },
       angular: { x: 0, y: 0,       z: teleopAngular }
@@ -3502,6 +3571,7 @@ function teleopStart(linDir, angDir) {
 function teleopStop() {
   clearInterval(teleopInterval); teleopInterval = null;
   if (rosConnected) {
+    expectedUiCmdVelUntil = Date.now() + 800;
     topicCmdVel.publish(new ROSLIB.Message({ linear:{x:0,y:0,z:0}, angular:{x:0,y:0,z:0} }));
   }
 }
@@ -3866,8 +3936,9 @@ function renderOrders(data) {
       <td class="time">${esc(r.created_at ?? '—')}</td>
       <td class="acts">
         ${r.status === 'PENDING' ? `<button class="btn btn-primary btn-sm" onclick="dispatchOrder(${r.id})">▶ Dispatch</button>` : ''}
-        ${r.status === 'PENDING' ? `<button class="btn btn-danger btn-sm" onclick="deleteOrder(${r.id},'${esc(r.order_code)}')">Del</button>` : ''}
+        ${['PENDING','COMPLETED','CANCELLED'].includes(r.status) ? `<button class="btn btn-danger btn-sm" onclick="deleteOrder(${r.id},'${esc(r.order_code)}')">Del</button>` : ''}
         ${r.status === 'IN_PROGRESS' ? `<button class="btn btn-ghost btn-sm" onclick="loadOrderToMission(${r.id})">📍 Load to AMR</button>` : ''}
+        ${r.status === 'IN_PROGRESS' ? `<button class="btn btn-danger btn-sm" onclick="cancelOrder(${r.id},'${esc(r.order_code)}')">Cancel</button>` : ''}
       </td></tr>`;
   }).join('');
 }
@@ -3994,24 +4065,19 @@ async function deleteOrder(oid, label) {
   } catch(e) { toast(e.message, 'err'); }
 }
 
-/* ── Seed demo data ────────────────────────────────────────── */
-async function seedDemo() {
-  try {
-    const r = await api('/seed-demo', { method: 'POST' });
-    toast(r.status === 'already_seeded' ? 'Already seeded' : 'Demo data seeded!');
-    loadCrud();
-    loadOrders();
-  } catch(e) { toast(e.message, 'err'); }
-}
-
 /* ── Load order pick tasks into AMR Mission Planner ────────── */
 async function loadOrderToMission(oid) {
   try {
     const d = await api('/orders/' + oid);
     if (!d.pick_tasks?.length) { toast('No pick tasks', 'err'); return; }
-    // Clear existing waypoints
+    // Clear existing waypoints and any active navigation state.
     clearWaypoints();
-    // Add each pick task as a waypoint
+    goalX = null;
+    goalY = null;
+    goalInitX = null;
+    globalPath = [];
+    setNavState('IDLE');
+    // Add each pick task as a waypoint for the mission planner only.
     d.pick_tasks.forEach(pt => {
       if (pt.status === 'PICKED') return; // skip already picked
       missionWaypoints.push({
@@ -4027,6 +4093,15 @@ async function loadOrderToMission(oid) {
     document.querySelector('[data-tab="amr"]').classList.add('active');
     document.getElementById('tab-amr').classList.add('active');
     toast('Loaded ' + missionWaypoints.length + ' waypoints from order');
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function cancelOrder(oid, code) {
+  if (!confirm(`Cancel order "${code}"? This will stop the robot and mark the order as cancelled.`)) return;
+  try {
+    await api('/orders/' + oid + '/cancel', { method: 'POST' });
+    toast('Order cancelled');
+    loadOrders();
   } catch(e) { toast(e.message, 'err'); }
 }
 

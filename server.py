@@ -187,23 +187,9 @@ def init_db():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Shelf coordinate map — matches dashboard PRESETS & physical rack positions
-# key = location_code, value = {x, y, yaw} in the ROS map frame
+# Shelf coordinates are stored in the Locations table when point mode saves a shelf.
+# We use loc_x / loc_y / loc_yaw from the DB instead of a hardcoded coordinate map.
 # ─────────────────────────────────────────────────────────────────────────────
-SHELF_COORDS = {
-    "RACK_A_01": {"x": -0.546, "y": -0.512, "yaw": -1.57},
-    "RACK_A_02": {"x": -0.546, "y": -0.512, "yaw": -1.57},
-    "RACK_A_03": {"x": -0.546, "y": -0.512, "yaw": -1.57},
-    "RACK_B_01": {"x": 0.997, "y": -0.417, "yaw": 0.0},
-    "RACK_B_02": {"x": 0.997, "y": -0.417, "yaw": 0.0},
-    "RACK_B_03": {"x": 0.997, "y": -0.417, "yaw": 0.0},
-    "RACK_C_01": {"x": 1.010, "y": 0.557, "yaw": 1.57},
-    "RACK_C_02": {"x": 1.010, "y": 0.557, "yaw": 1.57},
-    "RACK_C_03": {"x": 1.010, "y": 0.557, "yaw": 1.57},
-    "RACK_D_01": {"x": -0.534, "y": 0.278, "yaw": 3.14159},
-    "RACK_D_02": {"x": -0.534, "y": 0.278, "yaw": 3.14159},
-    "RACK_D_03": {"x": -0.534, "y": 0.278, "yaw": 3.14159},
-}
 HOME_COORD = {"x": -1.29553, "y": -0.0492027, "yaw": 0.1848}
 
 
@@ -240,14 +226,19 @@ def plan_pick_route(
     while remaining:
         best_idx, best_dist = 0, float("inf")
         for i, item in enumerate(remaining):
-            coord = SHELF_COORDS.get(item["location_code"], HOME_COORD)
-            d = math.sqrt((coord["x"] - cx) ** 2 + (coord["y"] - cy) ** 2)
+            if item.get("loc_x") is not None and item.get("loc_y") is not None:
+                coord_x, coord_y = item["loc_x"], item["loc_y"]
+            else:
+                coord_x, coord_y = HOME_COORD["x"], HOME_COORD["y"]
+            d = math.sqrt((coord_x - cx) ** 2 + (coord_y - cy) ** 2)
             if d < best_dist:
                 best_dist = d
                 best_idx = i
         chosen = remaining.pop(best_idx)
-        coord = SHELF_COORDS.get(chosen["location_code"], HOME_COORD)
-        cx, cy = coord["x"], coord["y"]
+        if chosen.get("loc_x") is not None and chosen.get("loc_y") is not None:
+            cx, cy = chosen["loc_x"], chosen["loc_y"]
+        else:
+            cx, cy = HOME_COORD["x"], HOME_COORD["y"]
         route.append(chosen)
 
     return route
@@ -989,7 +980,7 @@ async def create_order(b: OrderCreate):
             # Find best location: has this product, sufficient stock, prefer highest qty
             cur.execute(
                 """
-                SELECT TOP 1 i.location_id, i.quantity, l.location_code
+                SELECT TOP 1 i.location_id, i.quantity, l.location_code, l.loc_x, l.loc_y, l.loc_yaw
                 FROM Inventory i
                 JOIN Locations l ON i.location_id = l.id
                 WHERE i.product_id = ? AND i.quantity >= ?
@@ -1000,12 +991,12 @@ async def create_order(b: OrderCreate):
             )
             row = cur.fetchone()
             if row:
-                loc_id, inv_qty, loc_code = row
+                loc_id, inv_qty, loc_code, loc_x, loc_y, loc_yaw = row
             else:
                 # Fallback: pick any location with this product
                 cur.execute(
                     """
-                    SELECT TOP 1 i.location_id, i.quantity, l.location_code
+                    SELECT TOP 1 i.location_id, i.quantity, l.location_code, l.loc_x, l.loc_y, l.loc_yaw
                     FROM Inventory i
                     JOIN Locations l ON i.location_id = l.id
                     WHERE i.product_id = ?
@@ -1015,9 +1006,15 @@ async def create_order(b: OrderCreate):
                 )
                 row = cur.fetchone()
                 if row:
-                    loc_id, inv_qty, loc_code = row
+                    loc_id, inv_qty, loc_code, loc_x, loc_y, loc_yaw = row
                 else:
-                    loc_id, loc_code = None, None
+                    loc_id, loc_code, loc_x, loc_y, loc_yaw = (
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
 
             items_for_routing.append(
                 {
@@ -1026,17 +1023,34 @@ async def create_order(b: OrderCreate):
                     "quantity": qty,
                     "location_id": loc_id,
                     "location_code": loc_code,
+                    "loc_x": loc_x,
+                    "loc_y": loc_y,
+                    "loc_yaw": loc_yaw,
                 }
             )
 
         # 3. TSP route planning — start from assigned robot's home position
-        routable = [i for i in items_for_routing if i["location_code"]]
+        routable = [
+            i
+            for i in items_for_routing
+            if i["location_code"] is not None
+            and i["loc_x"] is not None
+            and i["loc_y"] is not None
+        ]
         robot_home = get_robot_home(robot_code)
         route = plan_pick_route(routable, robot_home["x"], robot_home["y"])
 
         # 4. Insert PickTasks
         for seq, item in enumerate(route, start=1):
-            coord = SHELF_COORDS.get(item["location_code"], HOME_COORD)
+            coord = {
+                "x": item["loc_x"] if item["loc_x"] is not None else HOME_COORD["x"],
+                "y": item["loc_y"] if item["loc_y"] is not None else HOME_COORD["y"],
+                "yaw": (
+                    item["loc_yaw"]
+                    if item["loc_yaw"] is not None
+                    else HOME_COORD["yaw"]
+                ),
+            }
             cur.execute(
                 """
                 INSERT INTO PickTasks
@@ -1096,6 +1110,33 @@ async def dispatch_order(oid: int):
 
     detail = get_order_detail(oid)
     await manager.broadcast({"type": "order_dispatched", "data": detail})
+    return detail
+
+
+@app.post("/orders/{oid}/cancel", tags=["Orders"])
+async def cancel_order(oid: int):
+    """Cancel an in-progress order, release the robot, and mark its pick tasks cancelled."""
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT assigned_robot, status FROM Orders WHERE id=?", oid)
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Order not found")
+        assigned_robot, status = row
+        if status != "IN_PROGRESS":
+            raise HTTPException(400, "Only IN_PROGRESS orders can be cancelled")
+
+        cur.execute("UPDATE Orders SET status='CANCELLED' WHERE id=?", oid)
+        cur.execute("UPDATE PickTasks SET status='CANCELLED' WHERE order_id=?", oid)
+        if assigned_robot:
+            cur.execute(
+                "UPDATE Robots SET status='IDLE' WHERE robot_code=? AND status='BUSY'",
+                assigned_robot,
+            )
+        conn.commit()
+
+    detail = get_order_detail(oid)
+    await manager.broadcast({"type": "order_cancelled", "data": detail})
     return detail
 
 

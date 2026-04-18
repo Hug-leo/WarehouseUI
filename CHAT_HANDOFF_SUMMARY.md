@@ -196,6 +196,7 @@ Workspace: e:/Warehouse
 - SLAM map save: fixed and diagnosable
 - TF chain in SLAM mode: fixed
 - Map switching across saved maps: fixed to /map-topic-driven flow
+- Initial pose UI fixed: `/initialpose` no longer forces local robot pose update; map display follows `/amcl_pose`
 
 ## 12. Current Focus
 
