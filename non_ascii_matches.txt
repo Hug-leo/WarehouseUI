@@ -1,0 +1,363 @@
+10:/* -- Tokens ----------------------------------------------------- */
+32:/* -- Header ----------------------------------------------------- */
+62:/* -- Tabs ------------------------------------------------------- */
+81:/* -- Tab panels ------------------------------------------------- */
+86:/* ---------------------------------------------------------------
+88:---------------------------------------------------------------- */
+91:/* -- spotlight (latest scan) ----------------------------------- */
+153:/* -- stat summary panel ---------------------------------------- */
+166:/* -- history feed ---------------------------------------------- */
+209:/* --------------------------------------------------------------
+211:---------------------------------------------------------------- */
+244:/* -- Buttons ---------------------------------------------------- */
+257:/* -- Modal ------------------------------------------------------ */
+297:/* -- Toast ------------------------------------------------------ */
+309:/* --------------------------------------------------------------
+311:---------------------------------------------------------------- */
+384:/* --------------------------------------------------------------
+385:   ORDERS TAB — STYLES
+386:---------------------------------------------------------------- */
+420:/* --------------------------------------------------------------
+421:   AMR CONTROL TAB — STYLES
+422:---------------------------------------------------------------- */
+702:/* ---------------------------------------------------------------
+704:---------------------------------------------------------------- */
+756:/* -- Pallet Lift Warning Light -------------------------------- */
+807:<!-- -- Header ---------------------------------------------------- -->
+810:    <div class="logo-icon">??</div>
+819:      <span id="ws-label">CONNECTING…</span>
+825:<!-- -- Tabs ------------------------------------------------------- -->
+827:  <button class="tab-btn active" data-tab="live">? Live View</button>
+833:  <button class="tab-btn" data-tab="camera">?? Robot Camera</button>
+834:  <button class="tab-btn" data-tab="orders">?? Orders <span class="cnt" id="cnt-orders">0</span></button>
+835:  <button class="tab-btn" data-tab="amr">?? AMR Control</button>
+836:  <button class="tab-btn" data-tab="sim">?? Simulation</button>
+839:<!-- --------------------------------------------------------------
+841:---------------------------------------------------------------- -->
+849:        <div class="spot-empty-icon">??</div>
+850:        <div class="spot-empty-txt">Waiting for robot scan…</div>
+856:            <div class="card-value robot" id="v-robot">—</div>
+862:            <div class="card-value loc" id="v-loc">—</div>
+869:            <div class="card-value prod" id="v-prod">—</div>
+875:          <div class="card-value qty" id="v-qty">—</div>
+879:          <div class="scan-time-val" id="v-id">—</div>
+881:          <div class="scan-time-val" id="v-time">—</div>
+910:    <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">20 most recent · real-time</span>
+914:      <span class="spinner"></span>Connecting to server…
+920:<!-- --------------------------------------------------------------
+922:---------------------------------------------------------------- -->
+931:      <tbody id="body-robots"><tr class="state-row"><td colspan="7"><span class="spinner"></span>Loading…</td></tr></tbody></table>
+936:<!-- --------------------------------------------------------------
+938:---------------------------------------------------------------- -->
+947:      <tbody id="body-locations"><tr class="state-row"><td colspan="6"><span class="spinner"></span>Loading…</td></tr></tbody></table>
+952:<!-- --------------------------------------------------------------
+954:---------------------------------------------------------------- -->
+963:      <tbody id="body-products"><tr class="state-row"><td colspan="5"><span class="spinner"></span>Loading…</td></tr></tbody></table>
+968:<!-- --------------------------------------------------------------
+970:---------------------------------------------------------------- -->
+979:      <tbody id="body-inventory"><tr class="state-row"><td colspan="6"><span class="spinner"></span>Loading…</td></tr></tbody></table>
+984:<!-- --------------------------------------------------------------
+986:---------------------------------------------------------------- -->
+995:      <tbody id="body-scanlogs"><tr class="state-row"><td colspan="5"><span class="spinner"></span>Loading…</td></tr></tbody></table>
+1000:<!-- --------------------------------------------------------------
+1002:---------------------------------------------------------------- -->
+1018:        <button class="btn btn-primary btn-sm" id="btn-start-cam" onclick="startCamera()">? Start Camera</button>
+1019:        <button class="btn btn-ghost   btn-sm" id="btn-stop-cam"  onclick="stopCamera()" disabled>¦ Stop Camera</button>
+1037:        <div class="cam-state-icon">??</div>
+1045:        <div class="cam-state-title">Connecting to camera…</div>
+1051:        <div class="cam-state-icon" style="color:var(--red)">?</div>
+1057:      <!-- Live feed container — innerHTML is nuked on stop to kill the MJPEG connection -->
+1064:      <span style="color:var(--muted)">MJPEG stream · auto-scales to window</span>
+1070:<!-- --------------------------------------------------------------
+1072:---------------------------------------------------------------- -->
+1088:          <tr class="state-row"><td colspan="8"><span class="spinner"></span>Loading…</td></tr>
+1097:      <div class="panel-title" id="order-detail-title">Order #—</div>
+1098:      <button class="btn btn-ghost btn-sm" onclick="closeOrderDetail()">? Close</button>
+1104:<!-- --------------------------------------------------------------
+1106:---------------------------------------------------------------- -->
+1115:        <option value="">— select robot —</option>
+1133:    <!-- -- LEFT COLUMN: Controls ------------------------------- -->
+1143:            <button class="mode-btn active-manual" id="mode-manual-btn" onclick="setMode('manual')">?? Manual</button>
+1144:            <button class="mode-btn" id="mode-auto-btn"   onclick="setMode('auto')">?? Auto Nav</button>
+1150:      <button class="estop-btn" onclick="emergencyStop()">?? EMERGENCY STOP</button>
+1161:            <button class="t-btn" id="t-fwd"  onmousedown="teleopStart(1,0)"  onmouseup="teleopStop()" ontouchstart="teleopStart(1,0)" ontouchend="teleopStop()">?</button>
+1163:            <button class="t-btn" id="t-left" onmousedown="teleopStart(0,1)"  onmouseup="teleopStop()" ontouchstart="teleopStart(0,1)" ontouchend="teleopStop()">?</button>
+1164:            <button class="t-btn stop-btn"    onclick="emergencyStop()">¦</button>
+1165:            <button class="t-btn" id="t-right" onmousedown="teleopStart(0,-1)" onmouseup="teleopStop()" ontouchstart="teleopStart(0,-1)" ontouchend="teleopStop()">?</button>
+1167:            <button class="t-btn" id="t-bwd"  onmousedown="teleopStart(-1,0)" onmouseup="teleopStop()" ontouchstart="teleopStart(-1,0)" ontouchend="teleopStop()">?</button>
+1186:          <div class="amr-card-title">Quick Nav — Presets</div>
+1193:            <button class="amr-btn amr-btn-ghost amr-btn-full" onclick="setInitialPose()">?? 2D Pose Estimate</button>
+1200:    <!-- -- CENTER COLUMN: Map ----------------------------------- -->
+1205:        <button class="map-tool-btn active" id="tool-nav"   onclick="setTool('nav')">?? Nav Goal</button>
+1206:        <button class="map-tool-btn"        id="tool-wp"    onclick="setTool('wp')">?? Add Waypoint</button>
+1207:        <button class="map-tool-btn"        id="tool-pan"   onclick="setTool('pan')">? Pan</button>
+1209:        <button class="map-tool-btn" onclick="mapZoom(1.2)">+</button>
+1210:        <button class="map-tool-btn" onclick="mapZoom(0.8)">-</button>
+1211:        <button class="map-tool-btn" onclick="mapResetView()">? Fit</button>
+1225:        <span class="map-hint" id="map-hint">Click map to set nav goal · Drag to set orientation</span>
+1231:          <div style="font-size:28px;opacity:.3">???</div>
+1238:        <span id="map-coord-cur">Map X: — · Y: —</span>
+1239:        <span id="map-coord-robot">Robot: — · —  ·  Yaw: —</span>
+1244:    <!-- -- RIGHT COLUMN: Status + Tuning ----------------------- -->
+1257:              <div class="ns-val" id="ns-gx">—</div>
+1261:              <div class="ns-val" id="ns-gy">—</div>
+1265:              <div class="ns-val" id="ns-dist">—</div>
+1269:              <div class="ns-val" id="ns-prog">—</div>
+1289:                <option value="">— select a saved map —</option>
+1291:              <button class="amr-btn amr-btn-ghost" onclick="listMaps()" title="Refresh map list" style="padding:6px 8px">??</button>
+1298:            <button class="amr-btn amr-btn-green" id="slam-load-btn" onclick="loadMap()" style="flex:1">??? Load Map & Navigate</button>
+1299:            <button class="amr-btn amr-btn-danger" id="slam-stopnav-btn" onclick="stopNav()" disabled style="flex:1">? Stop Navigation</button>
+1307:            <button class="amr-btn amr-btn-accent" id="slam-start-btn" onclick="startSlam()" style="flex:1">? Start SLAM</button>
+1308:            <button class="amr-btn amr-btn-danger"  id="slam-stop-btn"  onclick="stopSlam()" disabled style="flex:1">¦ Stop SLAM</button>
+1313:            <button class="amr-btn amr-btn-green" id="slam-save-btn" onclick="saveMap()" disabled>?? Save</button>
+1327:            <button class="amr-btn amr-btn-green" onclick="startMission()" id="mission-start-btn">? Start Mission</button>
+1328:            <button class="amr-btn amr-btn-ghost" onclick="stopMission()"  id="mission-stop-btn" disabled>¦ Stop</button>
+1329:            <button class="amr-btn amr-btn-danger"onclick="clearWaypoints()">? Clear</button>
+1333:              Switch to ?? Add Waypoint mode then click the map
+1346:            <button id="btn-multi-wp" class="amr-btn amr-btn-ghost" onclick="toggleMultiWaypointMode()" style="flex:2">?? 1. Enable Point Mode</button>
+1350:            <button class="amr-btn amr-btn-green" onclick="saveAllDraftWaypoints()" style="flex:2">?? 2. Save All To System</button>
+1351:            <button class="amr-btn amr-btn-danger" onclick="clearAllSavedWaypoints()" style="flex:1">?? Reset</button>
+1361:        <div class="amr-card-hdr"><div class="amr-card-title">IMU — BNO055</div></div>
+1365:              <div class="imu-lbl">?? Yaw</div>
+1366:              <div class="imu-val" id="imu-yaw-deg">0.00°</div>
+1369:              <div class="imu-lbl">? Theta (rad)</div>
+1374:              <div class="imu-val" id="imu-px" style="color:var(--green)">—</div>
+1378:              <div class="imu-val" id="imu-py" style="color:var(--green)">—</div>
+1387:          <div class="amr-card-title">PID — STM32 Motor</div>
+1400:          <button class="amr-btn amr-btn-accent amr-btn-full" onclick="sendPID()">? Upload PID to STM32</button>
+1404:            <button class="amr-btn amr-btn-green" style="flex:1" onclick="pidTestRun()">? Test Run</button>
+1405:            <button class="amr-btn amr-btn-danger"style="flex:1" onclick="pidTestStop()">¦ Stop</button>
+1408:            <div class="chart-box"><div class="chart-box-lbl">L-WHEEL  <span style="color:#e74c3c">— target</span>  <span style="color:#3b9eff">— actual</span></div><canvas id="chartAMR-L"></canvas></div>
+1418:<!-- --------------------------------------------------------------
+1420:---------------------------------------------------------------- -->
+1431:        ?? Drop URDF file here or click to browse
+1438:          <input type="text" id="sim-urdf-url" placeholder="https://…/robot.urdf"
+1444:        <button class="sim-btn sim-btn-ghost" style="width:100%" onclick="simLoadDefaultRobot()">?? Load TurtleBot3 (Built-in)</button>
+1464:        <button class="sim-btn sim-btn-ghost" onclick="simResetCamera()" style="flex:1">? Reset View</button>
+1486:      <div class="sim-row"><span class="sim-lbl">X</span><span class="sim-val" id="sim-pose-x">—</span></div>
+1487:      <div class="sim-row"><span class="sim-lbl">Y</span><span class="sim-val" id="sim-pose-y">—</span></div>
+1488:      <div class="sim-row"><span class="sim-lbl">Yaw</span><span class="sim-val" id="sim-pose-yaw">—</span></div>
+1496:        <button class="sim-btn sim-btn-green" id="sim-goal-btn" onclick="simToggleGoalMode()" style="flex:1">?? Click to Set Goal</button>
+1499:        <button class="sim-btn sim-btn-ghost" onclick="simFollowRobot()" style="flex:1">?? Follow Robot</button>
+1500:        <button class="sim-btn sim-btn-ghost" onclick="simTopView()" style="flex:1">? Top View</button>
+1511:      <div class="sim-hud" id="sim-fps-hud">FPS: —</div>
+1512:      <div class="sim-hud" id="sim-cursor-hud">World: — , —</div>
+1524:<!-- --------------------------------------------------------------
+1526:---------------------------------------------------------------- -->
+1531:      <button class="modal-close" onclick="closeModal('form-modal')">×</button>
+1545:      <button class="modal-close" onclick="closeModal('del-modal')">×</button>
+1559:  <div id="pallet-lift-sub">—</div>
+1564:<!-- --------------------------------------------------------------
+1566:---------------------------------------------------------------- -->
+1568:// Dynamic origin — works on localhost, LAN, or over the internet (tunnel/VPS)
+1572:/* -- State --------------------------------------------------- */
+1581:/* -- Pallet Lift Warning Light ------------------------------- */
+1592:  label.textContent = state === 'lifting' ? '? PALLET LIFTING'
+1593:                    : state === 'lifted'  ? '? PALLET LIFTED'
+1594:                    : state === 'wrong'   ? '? WRONG SHELF'
+1596:  sub.textContent   = location || '—';
+1603:/* -- Clock --------------------------------------------------- */
+1608:/* -- Tabs ---------------------------------------------------- */
+1621:/* ------------------------------------------------------------
+1622:   WEBSOCKET — real-time connection
+1623:------------------------------------------------------------ */
+1641:      // New scan from robot — prepend to feed
+1648:      // Any order event ? refresh orders table
+1651:        toast('?? QR verified at ' + (msg.location ?? '') + ' — lifting pallet…', 'ok');
+1658:        toast('? Order complete — all pallets lifted!', 'ok');
+1664:        toast('? WRONG SHELF — scanned ' + scanned + ', expected ' + expected, 'err');
+1665:        showPalletLift('wrong', 'Scanned: ' + scanned + '  ?  Expected: ' + expected);
+1672:    console.log('[WS] Disconnected — retrying in 3s…');
+1687:/* ------------------------------------------------------------
+1688:   SPOTLIGHT — big card for the latest scan
+1689:------------------------------------------------------------ */
+1694:  setText('v-robot', d.robot_code  || '—', !!d.robot_code);
+1695:  setText('v-loc',   d.qr_code     || '—', !!d.qr_code);
+1697:    (d.rack && d.slot) ? `Rack ${d.rack}  ·  Slot ${d.slot}` : '';
+1700:  setText('v-prod', d.product_name || d.product_code || '—', hasProd);
+1709:  document.getElementById('v-time').textContent = d.scan_time || '—';
+1724:/* ------------------------------------------------------------
+1725:   HISTORY FEED — grid of small cards
+1726:------------------------------------------------------------ */
+1740:        <span class="h-robot">${esc(d.robot_code || '—')}</span>
+1743:      <div class="h-loc">${esc(loc || '—')}</div>
+1754:  if (!dt) return '—';
+1759:/* ------------------------------------------------------------
+1761:------------------------------------------------------------ */
+1768:/* ------------------------------------------------------------
+1769:   CRUD — fetch & render tables
+1770:------------------------------------------------------------ */
+1805:      <td>${esc(r.description??'—')}</td>
+1807:      <td style="font-family:var(--mono);font-size:11px">${esc(r.ip_address??'—')}</td>
+1808:      <td style="font-size:11px;font-family:var(--mono)">${r.home_x != null ? Number(r.home_x).toFixed(3) : '—'}, ${r.home_y != null ? Number(r.home_y).toFixed(3) : '—'}</td>
+1827:      <td>${esc(r.rack??'—')}</td>
+1828:      <td>${esc(r.slot??'—')}</td>
+1829:      <td style="font-family:var(--mono);font-size:11px">${r.loc_x != null ? Number(r.loc_x).toFixed(3) : '—'}, ${r.loc_y != null ? Number(r.loc_y).toFixed(3) : '—'}, ${r.loc_yaw != null ? Number(r.loc_yaw).toFixed(2) : '—'}</td>
+1847:      <td>${esc(r.name??'—')}</td>
+1848:      <td>${esc(r.category??'—')}</td>
+1865:      <td class="code">${esc(r.product_code??'—')} <small style="color:var(--muted)">${esc(r.product_name??'')}</small></td>
+1866:      <td>${esc(r.location_code??'—')}</td>
+1895:/* ------------------------------------------------------------
+1897:------------------------------------------------------------ */
+1925:    const pOpts = _products.map(p => `<option value="${p.id}">${esc(p.product_code)} — ${esc(p.name??'')}</option>`).join('');
+1928:      <div class="field"><label>Product *</label><select id="f0"><option value="">— select —</option>${pOpts}</select></div>
+1929:      <div class="field"><label>Location *</label><select id="f1"><option value="">— select —</option>${lOpts}</select></div>
+1942:  document.getElementById('modal-title').textContent = 'Add — ' + table;
+1952:  document.getElementById('modal-title').textContent = 'Edit — ' + table + ' #' + id;
+2004:/* -- Delete -------------------------------------------------- */
+2018:/* -- Modal utils --------------------------------------------- */
+2027:/* -- Helpers ------------------------------------------------- */
+2034:  el.textContent = (type==='ok'?'? ':'? ') + msg;
+2041:/* ------------------------------------------------------------
+2043:------------------------------------------------------------ */
+2045:// Camera streams through the server proxy — no direct Pi connection needed.
+2081:  toast('Stream URL updated — press Start Camera to connect');
+2138:  // Nuke the wrapper innerHTML — the ONLY reliable way to abort an MJPEG stream
+2150:  // img fired onload — stream is alive
+2155:    '? Streaming from ' + MJPEG_URL;
+2161:  if (!camActive || token !== camStreamToken) return;           // user stopped manually — ignore
+2194:    txt.textContent  = 'Connecting…';
+2219:/* ------------------------------------------------------------
+2220:   AMR CONTROL — ROS2 / Nav2 Integration
+2222:------------------------------------------------------------ */
+2224:// -- Dynamic script loader (load ROS libs on demand) ----------
+2245:// -- State -----------------------------------------------------
+2339:// Map interaction — 'nav' | 'wp' | 'pan'
+2369:// -- Multi-robot fleet UI --------------------------------------
+2374:  sel.innerHTML = '<option value="">— select robot —</option>' +
+2375:    _robots.map(r => `<option value="${esc(r.robot_code)}">${esc(r.robot_code)} — ${esc(r.description ?? '')}</option>`).join('');
+2388:    const modeIcon = mode.includes('Cloud') ? '??' : (on ? '??' : '');
+2389:    return `<div style="display:flex;align-items:center;gap:3px;cursor:pointer" title="${esc(r.robot_code)} — ${on ? (mode || 'Connected') : 'Offline'}${r.ip_address ? ' ('+esc(r.ip_address)+')' : ''}" onclick="document.getElementById('amr-robot-select').value='${esc(r.robot_code)}';switchActiveRobot('${esc(r.robot_code)}')">
+2407:    rosSetStatus('Connected — ' + (robot?.ip_address ?? code), true);
+2418:// -- ROS connection --------------------------------------------
+2439:    rosSetStatus('Connecting…', false);
+2451:        const mode = agents[code] ? '?? Cloud Bridge' : '?? LAN';
+2454:          rosSetStatus(mode + ' — ' + ip, true);
+2461:        rosSetStatus('Connected — ' + ip, true);
+2520:// -- Setup all ROS topics --------------------------------------
+2539:  // -- amcl_pose ? robot position + history
+2574:  // -- IMU
+2578:    document.getElementById('imu-yaw-deg').textContent = (yaw * 180 / Math.PI).toFixed(2) + '°';
+2582:  // -- /map — occupancy grid
+2602:        setMapListMeta('Map frame received, waiting NAV status…');
+2615:  // -- /scan — LiDAR
+2639:  // -- /plan — global path
+2646:  // -- navigation status
+2662:  // -- /odom for PID chart actual wheel speeds
+2671:  // -- SLAM control topics
+2685:    console.log('[SLAM] ?? map_list RECEIVED:', msg);
+2710:  console.log('[SLAM] ?? Requesting map list via /slam/command');
+2711:  setMapListMeta('Requesting saved maps…');
+2715:// -- Map initialisation ----------------------------------------
+2762:// -- Coordinate conversion -------------------------------------
+2776:// -- Map drawing -----------------------------------------------
+3084:// -- Map mouse / touch handlers ---------------------------------
+3143:    `Map X: ${wp.x.toFixed(3)} · Y: ${wp.y.toFixed(3)}`;
+3202:// -- Map utilities ---------------------------------------------
+3238:// -- SLAM Control ----------------------------------------------
+3280:  console.log('[SLAM] listMaps() — requesting via ROS topic');
+3319:  setMapListMeta('Loading map "' + mapname + '"…');
+3322:  toast('Loading map "' + mapname + '"…');
+3345:  toast('Stopping navigation…');
+3354:  toast('Starting SLAM…');
+3364:  toast('Stopping SLAM…');
+3374:  toast('Saving map "' + name + '"…');
+3385:  console.log('[SLAM] ?? parseMapListPayload() START - input:', payload);
+3398:      console.log('[SLAM] ? Found array result:', result);
+3416:          console.log('[SLAM] ? Found fallback result:', parts);
+3427:        console.log('[SLAM] ? Found v.maps result:', result);
+3432:        console.log('[SLAM] ? Found v.list result:', result);
+3449:  console.log('[SLAM] ? parseMapListPayload() - No valid format found, returning []');
+3454:  console.log('[SLAM] ?? populateMapList() START - source:', source);
+3456:  console.log('[SLAM] ?? parseMapListPayload returned:', maps, 'count:', maps.length);
+3460:    console.log('[SLAM] ? Select element #slam-map-select not found!');
+3464:  console.log('[SLAM] ?? Previous selection:', prev);
+3467:    : '<option value="">— no saved maps —</option>';
+3468:  console.log('[SLAM] ?? Dropdown updated with', maps.length, 'options');
+3472:    console.log('[SLAM] ? SUCCESS - Found', maps.length, 'map(s):', maps);
+3475:    console.log('[SLAM] ? No maps found');
+3514:        setMapListMeta('Nav started for "' + mapSwitchTargetName + '", waiting for /map…');
+3517:          'Nav started with "' + (navMapRaw || '?') + '"; waiting for /map…',
+3564:  if (isNav)                            statusT.textContent = '??? Navigating with map: ' + state.substring(4);
+3565:  else if (isLoading)                   statusT.textContent = '? Loading map: ' + state.substring(8) + '…';
+3566:  else if (state.startsWith('SAVED:'))  statusT.textContent = '? Map saved: ' + state.substring(6);
+3567:  else if (state.startsWith('ERROR:'))  statusT.textContent = '? ' + state.substring(6);
+3568:  else if (isMapping)                   statusT.textContent = 'SLAM active — drive the robot to build the map';
+3569:  else if (isSaving)                    statusT.textContent = 'Saving map…';
+3573:// -- Navigation ------------------------------------------------
+3611:      `Robot: ${robotX.toFixed(3)} · ${robotY.toFixed(3)}  ·  Yaw: ${(robotYaw*180/Math.PI).toFixed(1)}°`;
+3659:  toast('Initial pose sent. Waiting for AMCL localization…', 'ok');
+3675:// -- Emergency stop --------------------------------------------
+3690:  toast('? EMERGENCY STOP — Robot halted', 'err');
+3694:// -- Teleop ----------------------------------------------------
+3731:// -- Mode switching --------------------------------------------
+3745:  toast(mode === 'manual' ? '?? Manual Mode active' : '?? Auto Navigation active', 'ok');
+3748:// -- Mission planner -------------------------------------------
+3768:    list.innerHTML = `<div style="text-align:center;padding:16px;color:var(--muted);font-family:var(--mono);font-size:10px">Switch to ?? Add Waypoint mode then click the map</div>`;
+3776:      <div class="wp-coords">X ${wp.x.toFixed(2)} · Y ${wp.y.toFixed(2)}</div>
+3777:      <button class="wp-del" onclick="removeMissionWaypoint(${i})" title="Remove">?</button>
+3827:    toast('? Mission complete — all waypoints reached', 'ok');
+3850:      <div class="wp-coords">Draft · X ${wp.x.toFixed(2)} · Y ${wp.y.toFixed(2)}</div>
+3851:      <button class="wp-del" onclick="draftWaypoints.splice(${i},1);updateDynamicWaypointsList();redrawMap()" title="Remove draft">?</button>
+3858:      <div class="wp-coords">${esc(wp.name || 'Shelf')} · X ${wp.x.toFixed(2)} · Y ${wp.y.toFixed(2)}</div>
+3886:    btn.textContent = isMultiWpMode ? '?? Point Mode: ON (Click map)' : '?? 1. Enable Point Mode';
+3963:// -- Preset nav buttons ----------------------------------------
+3979:// -- IMU display -----------------------------------------------
+3988:// -- PID -------------------------------------------------------
+3995:  toast(`PID uploaded — Kp=${kp} Ki=${ki}`, 'ok');
+4045:/* ------------------------------------------------------------
+4046:   ORDERS — CRUD & PICK WORKFLOW
+4047:------------------------------------------------------------ */
+4077:      <td>${esc(r.assigned_robot ?? '—')}</td>
+4081:      <td class="time">${esc(r.created_at ?? '—')}</td>
+4083:        ${r.status === 'PENDING' ? `<button class="btn btn-primary btn-sm" onclick="dispatchOrder(${r.id})">? Dispatch</button>` : ''}
+4085:        ${r.status === 'IN_PROGRESS' ? `<button class="btn btn-ghost btn-sm" onclick="loadOrderToMission(${r.id})">?? Load to AMR</button>` : ''}
+4126:          <div><strong>${esc(pt.location_code ?? '?')}</strong> — ${esc(pt.product_name ?? '')} ×${pt.quantity}</div>
+4146:/* -- Create Order Modal -------------------------------------- */
+4150:  const pOpts = _products.map(p => `<option value="${p.id}">${esc(p.product_code)} — ${esc(p.name ?? '')}</option>`).join('');
+4151:  const rOpts = _robots.filter(r => r.status === 'IDLE' || r.status === 'CHARGING').map(r => `<option value="${esc(r.robot_code)}">${esc(r.robot_code)} — ${esc(r.description ?? '')}</option>`).join('');
+4171:  const pOpts = _products.map(p => `<option value="${p.id}">${esc(p.product_code)} — ${esc(p.name ?? '')}</option>`).join('');
+4177:    <select class="oc-prod"><option value="">— product —</option>${pOpts}</select>
+4179:    <button onclick="this.parentElement.remove()">?</button>
+4210:/* -- Dispatch & Delete --------------------------------------- */
+4214:    toast('Order dispatched — ' + (d.pick_tasks?.length ?? 0) + ' pick stops');
+4229:/* -- Load order pick tasks into AMR Mission Planner ---------- */
+4269:/* ------------------------------------------------------------
+4270:   SIMULATION TAB — Three.js + URDF
+4271:------------------------------------------------------------ */
+4295:// Deferred loader — load Three.js + URDFLoader on first tab visit
+4317:// -- Init 3D scene ---------------------------------------------
+4360:  // -- Lights --
+4379:  // -- Ground plane (subtle) --
+4389:  // -- Grid --
+4393:  // -- Axes --
+4397:  // -- Goal marker (hidden initially) --
+4405:  // -- Events --
+4411:  // -- URDF drag-and-drop --
+4438:// -- Animation loop --------------------------------------------
+4467:    document.getElementById('sim-pose-yaw').textContent = ((robotYaw || 0) * 180 / Math.PI).toFixed(1) + '°';
+4483:// -- URDF Loading ----------------------------------------------
+4488:    document.getElementById('sim-urdf-name').textContent = '? ' + file.name;
+4500:      document.getElementById('sim-urdf-name').textContent = '? Loaded from URL';
+4604:// -- Built-in TurtleBot3-style robot ---------------------------
+4614:  // Body — flat cylinder
+4680:  document.getElementById('sim-urdf-name').textContent = '? TurtleBot3 (built-in)';
+4703:// -- Scene toggles ---------------------------------------------
+4743:// -- Occupancy map as 3D floor texture -------------------------
+4759:    toast('No map data — load a map in AMR tab first', 'err');
+4772:      r = 26; g = 37; b = 53; a = 180;   // unknown — dark blue-gray
+4774:      r = 40; g = 40; b = 50; a = 255;   // occupied — dark
+4776:      r = 200; g = 210; b = 220; a = 200; // free — light
+4804:// -- 3D LiDAR point cloud --------------------------------------
+4818:    positions[i * 3 + 2] = -p.y;   // ROS Y ? Three.js -Z
+4846:// -- 3D navigation path ----------------------------------------
+4858:// -- 3D waypoint markers ---------------------------------------
+4911:// -- Click-to-set-goal -----------------------------------------
+4917:    btn.textContent = '? Cancel Goal Mode';
+4923:    btn.textContent = '?? Click to Set Goal';
+4946:  const worldY = -pt.z;   // Three.js Z ? ROS Y
+4983:// -- Multi-robot fleet visualization ---------------------------
+5001:// -- Tab activation hook ---------------------------------------
+5015:/* ------------------------------------------------------------
+5017:------------------------------------------------------------ */
+5018:connectWS();   // start WebSocket — handles live view

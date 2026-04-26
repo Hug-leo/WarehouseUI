@@ -1,1613 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Warehouse AMR Dashboard</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@400;600;700;900&display=swap" rel="stylesheet"/>
-<style>
-/* ── Tokens ───────────────────────────────────────────────────── */
-:root{
-  --bg:#090d12; --surface:#0f161f; --surface2:#141d28;
-  --border:#1a2636; --border2:#1f2f42;
-  --accent:#f5a623; --accent-dim:#7a5010; --accent-faint:rgba(245,166,35,.07);
-  --green:#2ecc71; --red:#e74c3c; --blue:#3b9eff; --purple:#a78bfa;
-  --text:#cdd9e5; --muted:#4a6278;
-  --mono:'Share Tech Mono',monospace;
-  --sans:'Barlow',sans-serif;
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{
-  background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;
-  background-image:
-    linear-gradient(rgba(245,166,35,.022) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(245,166,35,.022) 1px,transparent 1px);
-  background-size:48px 48px;
-}
-::-webkit-scrollbar{width:5px;height:5px}
-::-webkit-scrollbar-track{background:var(--bg)}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
-
-/* ── Header ───────────────────────────────────────────────────── */
-header{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:13px 28px;background:var(--surface);
-  border-bottom:2px solid var(--accent);position:sticky;top:0;z-index:200;
-}
-.logo{display:flex;align-items:center;gap:12px}
-.logo-icon{
-  width:34px;height:34px;border:2px solid var(--accent);
-  display:grid;place-items:center;font-size:17px;
-  animation:pulse-border 3s ease-in-out infinite;
-}
-@keyframes pulse-border{
-  0%,100%{box-shadow:0 0 0 0 rgba(245,166,35,0)}
-  50%{box-shadow:0 0 0 6px rgba(245,166,35,.1)}
-}
-.logo-text{font-weight:900;font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
-.logo-sub{font-size:9px;color:var(--muted);letter-spacing:.2em;text-transform:uppercase}
-.hdr-right{display:flex;align-items:center;gap:16px}
-.ws-badge{
-  display:flex;align-items:center;gap:6px;
-  font-family:var(--mono);font-size:11px;
-  padding:4px 10px;border:1px solid var(--border2);
-}
-.ws-badge.connected{color:var(--green);border-color:rgba(46,204,113,.35)}
-.ws-badge.disconnected{color:var(--red);border-color:rgba(231,76,60,.35)}
-.ws-dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:blink 1.4s ease-in-out infinite}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
-.clock{font-family:var(--mono);font-size:12px;color:var(--muted)}
-
-/* ── Tabs ─────────────────────────────────────────────────────── */
-.tabs-nav{
-  display:flex;background:var(--surface);border-bottom:1px solid var(--border);
-  padding:0 28px;gap:2px;overflow-x:auto;
-}
-.tab-btn{
-  padding:12px 20px;font-family:var(--sans);font-size:11px;font-weight:700;
-  letter-spacing:.15em;text-transform:uppercase;
-  background:none;border:none;border-bottom:3px solid transparent;
-  color:var(--muted);cursor:pointer;white-space:nowrap;transition:color .2s,border-color .2s;
-}
-.tab-btn:hover{color:var(--text)}
-.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
-.cnt{
-  display:inline-block;margin-left:5px;background:var(--border2);
-  padding:1px 6px;border-radius:10px;font-size:9px;color:var(--muted);font-family:var(--mono);
-}
-.tab-btn.active .cnt{background:var(--accent-dim);color:var(--accent)}
-
-/* ── Tab panels ───────────────────────────────────────────────── */
-.tab-panel{display:none;animation:fadein .18s ease}
-.tab-panel.active{display:block}
-@keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
-
-/* ═══════════════════════════════════════════════════════════════
-   LIVE VIEW TAB
-════════════════════════════════════════════════════════════════ */
-#tab-live{padding:24px 28px}
-
-/* ── spotlight (latest scan) ─────────────────────────────────── */
-.spotlight-wrap{
-  display:grid;
-  grid-template-columns:1fr 340px;
-  gap:16px;
-  margin-bottom:24px;
-}
-@media(max-width:900px){.spotlight-wrap{grid-template-columns:1fr}}
-
-.spotlight{
-  background:var(--surface);
-  border:1px solid var(--border2);
-  border-top:3px solid var(--accent);
-  padding:28px 32px;
-  position:relative;
-  overflow:hidden;
-}
-.spotlight::before{
-  content:'LATEST SCAN';
-  position:absolute;top:18px;right:20px;
-  font-family:var(--mono);font-size:9px;letter-spacing:.2em;
-  color:var(--accent-dim);
-}
-.spotlight.flash{animation:spot-flash .6s ease-out}
-@keyframes spot-flash{
-  0%{border-top-color:var(--green);box-shadow:0 0 28px rgba(46,204,113,.2)}
-  100%{border-top-color:var(--accent);box-shadow:none}
-}
-.spot-empty{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  min-height:180px;gap:10px;color:var(--muted);
-}
-.spot-empty-icon{font-size:36px;opacity:.3}
-.spot-empty-txt{font-family:var(--mono);font-size:11px;letter-spacing:.15em}
-
-/* scan card rows */
-.scan-card{display:flex;flex-direction:column;gap:20px}
-
-.card-row{display:flex;align-items:flex-start;gap:0}
-.card-label{
-  font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
-  color:var(--muted);width:110px;flex-shrink:0;padding-top:4px;
-}
-.card-value{
-  font-family:var(--mono);font-size:22px;font-weight:600;
-  color:var(--text);line-height:1.2;word-break:break-all;
-}
-.card-value.robot {color:var(--green)}
-.card-value.loc   {color:var(--accent)}
-.card-value.prod  {color:var(--blue)}
-.card-value.qty   {color:var(--purple);font-size:28px}
-.card-value.na    {color:var(--muted);font-size:14px;padding-top:5px}
-
-.card-sub{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px}
-
-.scan-time-bar{
-  margin-top:18px;padding-top:14px;border-top:1px solid var(--border);
-  display:flex;align-items:center;justify-content:space-between;
-}
-.scan-time-lbl{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.12em}
-.scan-time-val{font-family:var(--mono);font-size:12px;color:var(--text)}
-
-/* ── stat summary panel ──────────────────────────────────────── */
-.stat-stack{
-  display:flex;flex-direction:column;gap:12px;
-}
-.stat-box{
-  background:var(--surface);border:1px solid var(--border);
-  padding:18px 20px;
-}
-.stat-lbl{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
-.stat-val{font-family:var(--mono);font-size:26px;color:var(--accent);line-height:1}
-.stat-val.g{color:var(--green)}
-.stat-sub{font-size:10px;color:var(--muted);margin-top:4px}
-
-/* ── history feed ────────────────────────────────────────────── */
-.feed-header{
-  display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;
-}
-.feed-title{
-  font-size:10px;letter-spacing:.22em;text-transform:uppercase;
-  color:var(--accent);display:flex;align-items:center;gap:8px;
-}
-.feed-title::before{content:'';display:inline-block;width:3px;height:14px;background:var(--accent)}
-.feed-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
-  gap:10px;
-  max-height:420px;overflow-y:auto;
-  padding-right:4px;
-}
-
-/* history card */
-.h-card{
-  background:var(--surface);border:1px solid var(--border);
-  padding:14px 16px;cursor:default;
-  transition:border-color .2s,background .2s;
-  position:relative;
-}
-.h-card:hover{border-color:var(--border2);background:var(--surface2)}
-.h-card.new{animation:card-in .4s ease-out}
-@keyframes card-in{
-  from{opacity:0;transform:translateY(-8px);border-color:var(--green)}
-  80%{border-color:var(--green)}
-  to{opacity:1;transform:none}
-}
-.h-card-top{
-  display:flex;align-items:center;justify-content:space-between;
-  margin-bottom:10px;
-}
-.h-robot{font-family:var(--mono);font-size:12px;color:var(--green)}
-.h-time{font-family:var(--mono);font-size:10px;color:var(--muted)}
-.h-loc{font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:600;margin-bottom:6px}
-.h-prod{font-family:var(--mono);font-size:12px;color:var(--blue);margin-bottom:2px}
-.h-qty{font-family:var(--mono);font-size:11px;color:var(--muted)}
-.h-qty span{color:var(--purple)}
-.h-na{font-family:var(--mono);font-size:10px;color:var(--muted);font-style:italic}
-
-/* ══════════════════════════════════════════════════════════════
-   CRUD TABS (shared styles)
-════════════════════════════════════════════════════════════════ */
-.crud-panel{padding:22px 28px}
-.panel-header{
-  display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;
-}
-.panel-title{
-  font-size:10px;letter-spacing:.25em;text-transform:uppercase;
-  color:var(--accent);display:flex;align-items:center;gap:8px;
-}
-.panel-title::before{content:'';display:inline-block;width:3px;height:14px;background:var(--accent)}
-
-.table-wrap{border:1px solid var(--border);overflow:hidden;overflow-x:auto}
-table{width:100%;border-collapse:collapse;min-width:420px}
-thead tr{background:#0a1018;border-bottom:1px solid var(--accent)}
-th{
-  padding:10px 14px;text-align:left;font-size:9px;letter-spacing:.2em;
-  text-transform:uppercase;color:var(--accent-dim);font-weight:700;white-space:nowrap;
-}
-tbody tr{border-bottom:1px solid var(--border);transition:background .15s}
-tbody tr:last-child{border-bottom:none}
-tbody tr:hover{background:var(--accent-faint)}
-td{padding:10px 14px;font-family:var(--mono);font-size:12px;color:var(--text)}
-td.id{color:var(--muted);font-size:10px}
-td.code{color:var(--accent);font-weight:600}
-td.robot{color:var(--green)}
-td.qty{color:var(--purple);font-weight:600}
-td.time{color:var(--muted);font-size:11px}
-td.acts{display:flex;gap:5px}
-.state-row td{text-align:center;padding:44px 14px;color:var(--muted);font-family:var(--mono);font-size:11px}
-.spinner{display:inline-block;width:13px;height:13px;border:2px solid var(--border);
-  border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:5px}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* ── Buttons ──────────────────────────────────────────────────── */
-.btn{
-  display:inline-flex;align-items:center;gap:5px;padding:7px 14px;
-  border:none;cursor:pointer;font-family:var(--sans);font-weight:700;
-  font-size:10px;letter-spacing:.12em;text-transform:uppercase;
-  transition:opacity .15s,transform .1s;
-}
-.btn:hover{opacity:.85}.btn:active{transform:scale(.96)}
-.btn-primary{background:var(--accent);color:#000}
-.btn-danger{background:var(--red);color:#fff}
-.btn-ghost{background:var(--border);color:var(--text)}
-.btn-sm{padding:4px 9px;font-size:9px}
-
-/* ── Modal ────────────────────────────────────────────────────── */
-.modal-backdrop{
-  position:fixed;inset:0;background:rgba(0,0,0,.75);
-  display:none;place-items:center;z-index:500;padding:20px;
-}
-.modal-backdrop.open{display:grid}
-.modal{
-  background:var(--surface);border:1px solid var(--border2);
-  border-top:3px solid var(--accent);width:100%;max-width:460px;
-  max-height:90vh;overflow-y:auto;animation:modal-in .18s ease;
-}
-.modal.danger{border-top-color:var(--red)}
-@keyframes modal-in{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
-.modal-header{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:16px 20px;border-bottom:1px solid var(--border);
-}
-.modal-title{font-weight:700;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
-.modal-title.danger{color:var(--red)}
-.modal-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1}
-.modal-close:hover{color:var(--text)}
-.modal-body{padding:20px}
-.modal-footer{
-  padding:14px 20px;border-top:1px solid var(--border);
-  display:flex;justify-content:flex-end;gap:8px;
-}
-.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.form-grid.one{grid-template-columns:1fr}
-.field{display:flex;flex-direction:column;gap:4px}
-.field.full{grid-column:1/-1}
-label{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
-input,select{
-  background:var(--bg);border:1px solid var(--border2);color:var(--text);
-  font-family:var(--mono);font-size:12px;padding:8px 11px;outline:none;transition:border-color .2s;
-}
-input:focus,select:focus{border-color:var(--accent)}
-select option{background:var(--surface)}
-.confirm-msg{font-size:13px;color:var(--text);line-height:1.65}
-.confirm-msg strong{color:var(--accent);font-family:var(--mono)}
-
-/* ── Toast ────────────────────────────────────────────────────── */
-#toast{
-  position:fixed;bottom:22px;right:22px;
-  background:var(--surface2);border:1px solid var(--border2);
-  padding:11px 16px;font-family:var(--mono);font-size:11px;
-  display:none;z-index:999;animation:slide-up .22s ease;
-  max-width:320px;border-left-width:3px;
-}
-#toast.ok{color:var(--green);border-left-color:var(--green)}
-#toast.err{color:var(--red);border-left-color:var(--red)}
-@keyframes slide-up{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
-
-/* ══════════════════════════════════════════════════════════════
-   CAMERA TAB STYLES
-════════════════════════════════════════════════════════════════ */
-
-/* Status badge */
-.cam-badge{
-  display:flex;align-items:center;gap:6px;
-  font-family:var(--mono);font-size:11px;
-  padding:5px 12px;border:1px solid transparent;
-  transition:color .3s,border-color .3s;
-}
-.cam-badge.online { color:var(--green);border-color:rgba(46,204,113,.35) }
-.cam-badge.offline{ color:var(--muted);border-color:var(--border)        }
-.cam-dot{
-  width:7px;height:7px;border-radius:50%;background:currentColor;
-}
-.cam-badge.online .cam-dot{ animation:blink 1.4s ease-in-out infinite }
-
-/* URL bar */
-.cam-url-bar{
-  display:flex;align-items:center;gap:10px;
-  background:var(--surface2);border:1px solid var(--border);
-  padding:10px 14px;margin-bottom:16px;flex-wrap:wrap;
-}
-.cam-url-lbl{
-  font-family:var(--mono);font-size:10px;letter-spacing:.15em;
-  text-transform:uppercase;color:var(--muted);white-space:nowrap;
-}
-.cam-url-bar input{
-  flex:1;min-width:220px;background:var(--bg);
-  border:1px solid var(--border2);color:var(--accent);
-  font-family:var(--mono);font-size:12px;padding:7px 11px;
-}
-.cam-url-bar input:focus{border-color:var(--accent)}
-
-/* Video window */
-.cam-window{
-  width:100%;
-  aspect-ratio:16/9;
-  background:#000;
-  border:1px solid var(--border2);
-  border-top:3px solid var(--accent);
-  display:flex;align-items:center;justify-content:center;
-  overflow:hidden;position:relative;
-  max-height:62vh;
-}
-
-/* Shared state overlay */
-.cam-state{
-  display:flex;flex-direction:column;align-items:center;
-  justify-content:center;gap:10px;
-  text-align:center;padding:40px;
-}
-.cam-state-icon{font-size:40px;opacity:.45}
-.cam-state-title{
-  font-family:var(--mono);font-size:14px;letter-spacing:.1em;color:var(--text);
-}
-.cam-state-sub{
-  font-family:var(--mono);font-size:11px;color:var(--muted);max-width:340px;line-height:1.6;
-}
-
-/* Loading spinner (larger than table spinner) */
-.cam-spinner{
-  width:36px;height:36px;
-  border:3px solid var(--border);border-top-color:var(--accent);
-  border-radius:50%;animation:spin .8s linear infinite;
-  margin-bottom:4px;
-}
-
-/* Footer */
-.cam-footer{
-  display:flex;justify-content:space-between;align-items:center;
-  padding:10px 14px;background:var(--surface2);border:1px solid var(--border);
-  border-top:none;font-family:var(--mono);font-size:10px;flex-wrap:wrap;gap:8px;
-}
-/* ══════════════════════════════════════════════════════════════
-   ORDERS TAB — STYLES
-════════════════════════════════════════════════════════════════ */
-.order-status{
-  display:inline-block;padding:2px 8px;border-radius:3px;
-  font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.08em;
-}
-.order-status.PENDING{background:rgba(245,166,35,.15);color:var(--accent)}
-.order-status.IN_PROGRESS{background:rgba(59,158,255,.15);color:var(--blue)}
-.order-status.COMPLETED{background:rgba(46,204,113,.15);color:var(--green)}
-.order-status.CANCELLED{background:rgba(231,76,60,.15);color:var(--red)}
-.order-progress{
-  width:100px;height:6px;background:var(--border2);border-radius:3px;overflow:hidden;display:inline-block;
-  vertical-align:middle;margin-right:6px;
-}
-.order-progress-fill{height:100%;background:var(--green);border-radius:3px;transition:width .3s}
-.pick-task-row{display:flex;gap:12px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border)}
-.pick-task-row:last-child{border-bottom:none}
-.pick-task-seq{
-  width:24px;height:24px;border-radius:50%;background:var(--border2);
-  display:grid;place-items:center;font-family:var(--mono);font-size:11px;font-weight:700;flex-shrink:0;
-}
-.pick-task-seq.PICKED{background:rgba(46,204,113,.2);color:var(--green)}
-.pick-task-seq.SCANNED{background:rgba(59,158,255,.2);color:var(--blue)}
-.pick-task-info{flex:1;font-size:12px}
-.pick-task-status{font-family:var(--mono);font-size:10px}
-#order-create-items{max-height:220px;overflow-y:auto;margin:8px 0}
-.oc-item-row{display:flex;gap:8px;align-items:center;margin-bottom:6px}
-.oc-item-row select,.oc-item-row input{
-  background:var(--bg);border:1px solid var(--border2);color:var(--text);
-  font-family:var(--mono);font-size:12px;padding:6px;outline:none;
-}
-.oc-item-row select{flex:2}
-.oc-item-row input{flex:1;width:60px;text-align:center}
-.oc-item-row button{background:none;border:none;color:var(--red);cursor:pointer;font-size:14px}
-
-/* ══════════════════════════════════════════════════════════════
-   AMR CONTROL TAB — STYLES
-════════════════════════════════════════════════════════════════ */
-#tab-amr { padding:0 }
-.amr-layout {
-  display:grid;
-  grid-template-columns:300px 1fr 300px;
-  grid-template-rows:auto 1fr;
-  min-height:calc(100vh - 120px);
-  gap:0;
-}
-@media(max-width:1100px){
-  .amr-layout{ grid-template-columns:1fr 1fr; }
-  .amr-map-col{ grid-column:1/-1; order:-1; }
-}
-@media(max-width:700px){
-  .amr-layout{ grid-template-columns:1fr; }
-}
-
-/* Column panels */
-.amr-col {
-  border-right:1px solid var(--border);
-  overflow-y:auto;
-  padding:16px;
-  display:flex;
-  flex-direction:column;
-  gap:14px;
-}
-.amr-col:last-child{ border-right:none }
-.amr-map-col {
-  border-right:1px solid var(--border);
-  display:flex;
-  flex-direction:column;
-  background:var(--bg);
-}
-
-/* Section card */
-.amr-card {
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:2px;
-}
-.amr-card-hdr {
-  display:flex;align-items:center;justify-content:space-between;
-  padding:9px 14px;border-bottom:1px solid var(--border);
-}
-.amr-card-title {
-  font-size:9px;letter-spacing:.2em;text-transform:uppercase;
-  color:var(--accent);font-weight:700;
-  display:flex;align-items:center;gap:7px;
-}
-.amr-card-title::before{
-  content:'';display:inline-block;width:2px;height:12px;background:var(--accent);
-}
-.amr-card-body{ padding:12px 14px }
-
-/* Connection bar */
-.ros-bar {
-  display:flex;align-items:center;gap:8px;
-  padding:10px 14px;
-  background:var(--surface2);
-  border-bottom:1px solid var(--border);
-}
-.ros-bar input {
-  flex:1;background:var(--bg);border:1px solid var(--border2);
-  color:var(--text);font-family:var(--mono);font-size:11px;
-  padding:6px 10px;outline:none;
-}
-.ros-bar input:focus{border-color:var(--accent)}
-.ros-dot{
-  width:8px;height:8px;border-radius:50%;background:var(--red);
-  flex-shrink:0;transition:background .3s;
-}
-.ros-dot.on{ background:var(--green);animation:blink 1.8s ease-in-out infinite }
-.ros-status-txt{font-family:var(--mono);font-size:10px;color:var(--muted)}
-
-/* Mode toggle */
-.mode-toggle{
-  display:grid;grid-template-columns:1fr 1fr;gap:0;
-  border:1px solid var(--border2);overflow:hidden;
-}
-.mode-btn{
-  padding:9px;border:none;cursor:pointer;
-  font-family:var(--sans);font-weight:700;font-size:10px;
-  letter-spacing:.12em;text-transform:uppercase;
-  background:var(--surface2);color:var(--muted);
-  transition:background .2s,color .2s;
-}
-.mode-btn.active-manual{background:var(--blue);color:#fff}
-.mode-btn.active-auto{background:var(--green);color:#000}
-
-/* E-STOP */
-.estop-btn{
-  width:100%;padding:16px;border:none;cursor:pointer;
-  background:var(--red);color:#fff;
-  font-family:var(--sans);font-weight:900;font-size:13px;
-  letter-spacing:.18em;text-transform:uppercase;
-  border:3px solid #ff6b6b;
-  transition:filter .15s,transform .1s;
-  animation:estop-pulse 2s ease-in-out infinite;
-}
-.estop-btn:hover{filter:brightness(1.15)}
-.estop-btn:active{transform:scale(.97)}
-@keyframes estop-pulse{
-  0%,100%{box-shadow:0 0 0 0 rgba(231,76,60,0)}
-  50%{box-shadow:0 0 0 8px rgba(231,76,60,.2)}
-}
-
-/* Teleop grid */
-.teleop-grid{
-  display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;
-}
-.t-btn{
-  padding:14px 6px;border:none;cursor:pointer;
-  background:var(--surface2);border:1px solid var(--border2);
-  color:var(--text);font-size:16px;
-  transition:background .15s;
-  font-family:var(--mono);
-}
-.t-btn:active,.t-btn.pressed{background:var(--blue);border-color:var(--blue)}
-.t-btn.stop-btn{background:rgba(231,76,60,.15);border-color:var(--red);color:var(--red)}
-.t-btn:disabled{opacity:.3;cursor:default}
-
-/* Speed slider */
-.speed-row{
-  display:flex;align-items:center;gap:10px;margin-top:6px;
-}
-.speed-row label{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
-.speed-row input[type=range]{flex:1;accent-color:var(--accent)}
-.speed-val{font-family:var(--mono);font-size:11px;color:var(--accent);width:42px;text-align:right}
-
-/* Waypoint list */
-.wp-list{
-  max-height:160px;overflow-y:auto;
-  display:flex;flex-direction:column;gap:4px;
-  margin-top:8px;
-}
-.wp-item{
-  display:flex;align-items:center;gap:8px;
-  padding:6px 10px;
-  background:var(--surface2);border:1px solid var(--border);
-  font-family:var(--mono);font-size:11px;color:var(--muted);
-  cursor:pointer;transition:border-color .15s;
-}
-.wp-item:hover{border-color:var(--border2)}
-.wp-item.active-wp{border-color:var(--green);color:var(--green)}
-.wp-item.done-wp{border-color:var(--border);color:var(--muted);opacity:.5}
-.wp-num{
-  width:18px;height:18px;border-radius:50%;
-  background:var(--accent);color:#000;
-  display:grid;place-items:center;font-size:9px;font-weight:700;flex-shrink:0;
-}
-.wp-item.active-wp .wp-num{background:var(--green)}
-.wp-item.done-wp .wp-num{background:var(--border);color:var(--muted)}
-.wp-coords{flex:1}
-.wp-del{background:none;border:none;color:var(--red);cursor:pointer;font-size:13px;opacity:.6}
-.wp-del:hover{opacity:1}
-
-/* IMU display */
-.imu-grid{
-  display:grid;grid-template-columns:1fr 1fr;gap:8px;
-}
-.imu-box{
-  background:var(--surface2);border:1px solid var(--border);
-  padding:10px 12px;text-align:center;
-}
-.imu-lbl{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
-.imu-val{font-family:var(--mono);font-size:18px;color:var(--blue)}
-
-/* PID inputs */
-.pid-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;width:100%}
-.pid-grid > *{min-width:0}
-.pid-field{display:flex;flex-direction:column;gap:3px;min-width:0}
-.pid-field label{font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);line-height:1}
-.pid-row{display:flex;gap:6px;min-width:0;width:100%}
-.pid-row input{
-  flex:1;min-width:0;width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);
-  color:var(--text);font-family:var(--mono);font-size:11px;
-  padding:5px 4px;text-align:center;outline:none;
-}
-.pid-row input:focus{border-color:var(--accent)}
-
-.pid-meta{
-  margin-bottom:6px;
-  font-family:var(--mono);
-  font-size:8px;
-  line-height:1.2;
-  letter-spacing:.12em;
-  text-transform:uppercase;
-  color:var(--muted);
-}
-.pid-controls{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) auto auto;
-  gap:4px;
-  margin-top:6px;
-  align-items:center;
-}
-.pid-speed{
-  width:62px;
-  background:var(--bg);
-  border:1px solid var(--border2);
-  color:var(--text);
-  font-family:var(--mono);
-  font-size:11px;
-  padding:5px 4px;
-  text-align:center;
-  outline:none;
-}
-.pid-chart-box{height:84px;padding:6px}
-.pid-chart-box + .pid-chart-box{margin-top:5px}
-
-/* Chart wrappers */
-.chart-box{
-  background:var(--bg);border:1px solid var(--border);
-  padding:8px;position:relative;height:100px;
-}
-.chart-box-lbl{
-  position:absolute;top:6px;left:10px;
-  font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.12em;
-  text-transform:uppercase;
-}
-
-/* Navigation status panel */
-.nav-status{
-  display:grid;grid-template-columns:1fr 1fr;gap:8px;
-}
-.ns-box{
-  background:var(--surface2);border:1px solid var(--border);
-  padding:10px 12px;
-}
-.ns-lbl{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
-.ns-val{font-family:var(--mono);font-size:13px;color:var(--text)}
-.ns-val.idle   {color:var(--muted)}
-.ns-val.navigating{color:var(--blue)}
-.ns-val.success{color:var(--green)}
-.ns-val.failed {color:var(--red)}
-
-/* Map container */
-#amr-map-wrap{
-  flex:1;
-  position:relative;
-  background:#1a2535;
-  overflow:hidden;
-  cursor:crosshair;
-  min-height:400px;
-}
-#amr-map-wrap canvas{display:block}
-.map-toolbar{
-  display:flex;align-items:center;gap:8px;
-  padding:8px 14px;background:var(--surface);
-  border-bottom:1px solid var(--border);
-  flex-wrap:wrap;
-}
-.map-tool-btn{
-  padding:5px 12px;border:1px solid var(--border2);
-  background:var(--surface2);color:var(--muted);
-  font-family:var(--mono);font-size:10px;letter-spacing:.1em;
-  cursor:pointer;transition:background .15s,color .15s;
-}
-.map-tool-btn:hover{background:var(--border2);color:var(--text)}
-.map-tool-btn.active{background:var(--accent);color:#000;border-color:var(--accent)}
-.map-hint{
-  flex:1;text-align:right;font-family:var(--mono);font-size:10px;
-  color:var(--muted);
-}
-.map-coords{
-  padding:4px 14px;background:var(--surface);border-top:1px solid var(--border);
-  font-family:var(--mono);font-size:10px;color:var(--muted);
-  display:flex;justify-content:space-between;
-}
-
-/* Waypoint preset buttons */
-.wp-preset-grid{display:flex;flex-direction:column;gap:5px}
-.wp-preset{
-  display:flex;align-items:center;gap:8px;
-  padding:8px 10px;border:1px solid var(--border2);
-  background:var(--surface2);cursor:pointer;
-  font-family:var(--mono);font-size:11px;color:var(--text);
-  transition:border-color .15s,background .15s;
-}
-.wp-preset:hover{border-color:var(--accent);background:var(--accent-faint)}
-.wp-preset-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-
-/* Toggle switch */
-.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:4px 0}
-.toggle-lbl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.toggle{position:relative;width:36px;height:20px;cursor:pointer}
-.toggle input{opacity:0;width:0;height:0}
-.toggle-slider{
-  position:absolute;inset:0;background:var(--border2);
-  border-radius:10px;transition:.2s;
-}
-.toggle-slider:before{
-  content:'';position:absolute;height:14px;width:14px;
-  left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;
-}
-.toggle input:checked + .toggle-slider{background:var(--green)}
-.toggle input:checked + .toggle-slider:before{transform:translateX(16px)}
-
-/* Small utility buttons */
-.amr-btn{
-  display:inline-flex;align-items:center;gap:5px;
-  padding:7px 12px;border:none;cursor:pointer;
-  font-family:var(--sans);font-weight:700;font-size:10px;
-  letter-spacing:.1em;text-transform:uppercase;
-  transition:opacity .15s;
-}
-.amr-btn:hover{opacity:.85}
-.amr-btn-accent{background:var(--accent);color:#000}
-.amr-btn-green{background:var(--green);color:#000}
-.amr-btn-ghost{background:var(--border);color:var(--text)}
-.amr-btn-danger{background:var(--red);color:#fff}
-.amr-btn-full{width:100%;justify-content:center}
-.amr-btn:disabled{opacity:.3;cursor:default}
-
-/* ═══════════════════════════════════════════════════════════════
-   SIMULATION TAB
-════════════════════════════════════════════════════════════════ */
-#tab-sim{padding:0;height:calc(100vh - 110px);display:none;position:relative}
-#tab-sim.active{display:flex!important}
-.sim-sidebar{
-  width:320px;min-width:280px;background:var(--surface);border-right:1px solid var(--border);
-  display:flex;flex-direction:column;overflow-y:auto;
-}
-.sim-viewport{flex:1;position:relative;background:#0d1117}
-#sim-canvas{width:100%;height:100%;display:block}
-.sim-panel{padding:14px 16px;border-bottom:1px solid var(--border)}
-.sim-panel-title{
-  font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;
-  color:var(--accent);margin-bottom:8px;font-weight:700;
-}
-.sim-row{display:flex;gap:6px;margin-bottom:6px;align-items:center}
-.sim-lbl{font-family:var(--mono);font-size:10px;color:var(--muted);min-width:60px}
-.sim-val{font-family:var(--mono);font-size:11px;color:var(--text)}
-.sim-btn{
-  padding:6px 12px;border:none;border-radius:6px;font-family:var(--mono);font-size:11px;
-  cursor:pointer;font-weight:600;transition:opacity .15s;
-}
-.sim-btn:hover{opacity:.85}
-.sim-btn:disabled{opacity:.3;cursor:default}
-.sim-btn-primary{background:var(--accent);color:#000}
-.sim-btn-green{background:var(--green);color:#000}
-.sim-btn-danger{background:var(--red);color:#fff}
-.sim-btn-ghost{background:var(--border);color:var(--text)}
-.sim-file-drop{
-  border:2px dashed var(--border2);border-radius:8px;padding:20px;text-align:center;
-  color:var(--muted);font-family:var(--mono);font-size:10px;cursor:pointer;
-  transition:border-color .2s,background .2s;
-}
-.sim-file-drop:hover,.sim-file-drop.drag-over{border-color:var(--accent);background:rgba(0,224,255,.04)}
-.sim-robot-item{
-  display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;
-  background:var(--bg);margin-bottom:4px;font-family:var(--mono);font-size:11px;
-}
-.sim-robot-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.sim-overlay{
-  position:absolute;top:12px;right:12px;display:flex;flex-direction:column;gap:6px;
-  pointer-events:none;z-index:10;
-}
-.sim-overlay>*{pointer-events:auto}
-.sim-hud{
-  background:rgba(13,17,23,.85);backdrop-filter:blur(6px);border:1px solid var(--border);
-  border-radius:8px;padding:8px 12px;font-family:var(--mono);font-size:10px;color:var(--muted);
-}
-.sim-crosshair{
-  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  width:20px;height:20px;pointer-events:none;opacity:.3;display:none;
-}
-
-/* ── Pallet Lift Warning Light ──────────────────────────────── */
-#pallet-lift-badge{
-  position:fixed;bottom:60px;right:20px;z-index:9999;
-  display:none;flex-direction:column;align-items:center;gap:6px;
-  background:rgba(13,17,23,.96);border:1px solid var(--border);
-  border-radius:12px;padding:14px 18px;min-width:160px;
-  box-shadow:0 4px 28px rgba(0,0,0,.55);
-}
-#pallet-lift-light{
-  width:40px;height:40px;border-radius:50%;flex-shrink:0;
-  transition:background .3s,box-shadow .3s;
-}
-#pallet-lift-light.lifting{
-  background:#f5a623;
-  box-shadow:0 0 14px 5px #f5a62399;
-  animation:lift-pulse .7s ease-in-out infinite alternate;
-}
-#pallet-lift-light.lifted{
-  background:#2ecc71;
-  box-shadow:0 0 14px 5px #2ecc7199;
-  animation:none;
-}
-#pallet-lift-light.wrong{
-  background:#e74c3c;
-  box-shadow:0 0 14px 5px #e74c3c99;
-  animation:wrong-flash .4s step-start infinite;
-}
-#pallet-lift-light.idle{
-  background:#4a5568;
-  box-shadow:none;
-  animation:none;
-}
-@keyframes lift-pulse{
-  from{box-shadow:0 0 8px 3px #f5a62388}
-  to  {box-shadow:0 0 28px 14px #f5a623bb}
-}
-@keyframes wrong-flash{
-  0%,100%{opacity:1}
-  50%{opacity:.15}
-}
-#pallet-lift-label{
-  font-family:var(--mono);font-size:10px;font-weight:700;
-  letter-spacing:.12em;text-transform:uppercase;color:var(--text);text-align:center;
-}
-#pallet-lift-sub{
-  font-family:var(--mono);font-size:9px;color:var(--muted);text-align:center;
-  max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-</style>
-<body>
-
-<!-- ── Header ──────────────────────────────────────────────────── -->
-<header>
-  <div class="logo">
-    <div class="logo-icon">🤖</div>
-    <div>
-      <div class="logo-text">WarehouseOS</div>
-      <div class="logo-sub">AMR Real-Time Dashboard</div>
-    </div>
-  </div>
-  <div class="hdr-right">
-    <div class="ws-badge disconnected" id="ws-badge">
-      <div class="ws-dot"></div>
-      <span id="ws-label">CONNECTING…</span>
-    </div>
-    <div class="clock" id="clock">--:--:--</div>
-  </div>
-</header>
-
-<!-- ── Tabs ─────────────────────────────────────────────────────── -->
-<nav class="tabs-nav">
-  <button class="tab-btn active" data-tab="live">⚡ Live View</button>
-  <button class="tab-btn" data-tab="robots">Robots <span class="cnt" id="cnt-robots">0</span></button>
-  <button class="tab-btn" data-tab="locations">Locations <span class="cnt" id="cnt-locations">0</span></button>
-  <button class="tab-btn" data-tab="products">Products <span class="cnt" id="cnt-products">0</span></button>
-  <button class="tab-btn" data-tab="inventory">Inventory <span class="cnt" id="cnt-inventory">0</span></button>
-  <button class="tab-btn" data-tab="scanlogs">Scan Logs <span class="cnt" id="cnt-scanlogs">0</span></button>
-  <button class="tab-btn" data-tab="camera">📷 Robot Camera</button>
-  <button class="tab-btn" data-tab="orders">📦 Orders <span class="cnt" id="cnt-orders">0</span></button>
-  <button class="tab-btn" data-tab="amr">🤖 AMR Control</button>
-  <button class="tab-btn" data-tab="sim">🌐 Simulation</button>
-</nav>
-
-<!-- ══════════════════════════════════════════════════════════════
-     LIVE VIEW
-════════════════════════════════════════════════════════════════ -->
-<div class="tab-panel active" id="tab-live">
-
-  <div class="spotlight-wrap">
-
-    <!-- Spotlight card -->
-    <div class="spotlight" id="spotlight">
-      <div class="spot-empty" id="spot-empty">
-        <div class="spot-empty-icon">📡</div>
-        <div class="spot-empty-txt">Waiting for robot scan…</div>
-      </div>
-      <div class="scan-card" id="scan-card" style="display:none">
-        <div class="card-row">
-          <div class="card-label">Robot</div>
-          <div>
-            <div class="card-value robot" id="v-robot">—</div>
-          </div>
-        </div>
-        <div class="card-row">
-          <div class="card-label">Location</div>
-          <div>
-            <div class="card-value loc" id="v-loc">—</div>
-            <div class="card-sub" id="v-rack"></div>
-          </div>
-        </div>
-        <div class="card-row">
-          <div class="card-label">Product</div>
-          <div>
-            <div class="card-value prod" id="v-prod">—</div>
-            <div class="card-sub" id="v-cat"></div>
-          </div>
-        </div>
-        <div class="card-row">
-          <div class="card-label">Quantity</div>
-          <div class="card-value qty" id="v-qty">—</div>
-        </div>
-        <div class="scan-time-bar">
-          <div class="scan-time-lbl">Scan ID</div>
-          <div class="scan-time-val" id="v-id">—</div>
-          <div class="scan-time-lbl">Time</div>
-          <div class="scan-time-val" id="v-time">—</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Stats -->
-    <div class="stat-stack">
-      <div class="stat-box">
-        <div class="stat-lbl">Total Scans (session)</div>
-        <div class="stat-val" id="s-total">0</div>
-        <div class="stat-sub">in feed</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-lbl">Active Robots</div>
-        <div class="stat-val g" id="s-robots">0</div>
-        <div class="stat-sub">unique robot_code</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-lbl">Locations Visited</div>
-        <div class="stat-val" id="s-locs">0</div>
-        <div class="stat-sub">unique qr_code</div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- History feed -->
-  <div class="feed-header">
-    <div class="feed-title">Scan History</div>
-    <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">20 most recent · real-time</span>
-  </div>
-  <div class="feed-grid" id="feed-grid">
-    <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);font-family:var(--mono);font-size:11px">
-      <span class="spinner"></span>Connecting to server…
-    </div>
-  </div>
-
-</div>
-
-<!-- ══════════════════════════════════════════════════════════════
-     ROBOTS
-════════════════════════════════════════════════════════════════ -->
-<div class="tab-panel" id="tab-robots">
-  <div class="crud-panel">
-    <div class="panel-header">
-      <div class="panel-title">Robots</div>
-      <button class="btn btn-primary btn-sm" onclick="openAdd('robots')">+ Add Robot</button>
-    </div>
-    <div class="table-wrap">
-      <table><thead><tr><th>#</th><th>Robot Code</th><th>Description</th><th>Status</th><th>IP Address</th><th>Home (x, y)</th><th></th></tr></thead>
-      <tbody id="body-robots"><tr class="state-row"><td colspan="7"><span class="spinner"></span>Loading…</td></tr></tbody></table>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════════════════
-     LOCATIONS
-════════════════════════════════════════════════════════════════ -->
-<div class="tab-panel" id="tab-locations">
-  <div class="crud-panel">
-    <div class="panel-header">
-      <div class="panel-title">Rack Locations</div>
-      <button class="btn btn-primary btn-sm" onclick="openAdd('locations')">+ Add Location</button>
-    </div>
-    <div class="table-wrap">
-      <table><thead><tr><th>#</th><th>Location Code</th><th>Rack</th><th>Slot</th><th>Map (x, y, yaw)</th><th></th></tr></thead>
-      <tbody id="body-locations"><tr class="state-row"><td colspan="6"><span class="spinner"></span>Loading…</td></tr></tbody></table>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════════════════
-     PRODUCTS
-════════════════════════════════════════════════════════════════ -->
-<div class="tab-panel" id="tab-products">
-  <div class="crud-panel">
-    <div class="panel-header">
-      <div class="panel-title">Products</div>
-      <button class="btn btn-primary btn-sm" onclick="openAdd('products')">+ Add Product</button>
-    </div>
-    <div class="table-wrap">
-      <table><thead><tr><th>#</th><th>Product Code</th><th>Name</th><th>Category</th><th></th></tr></thead>
-      <tbody id="body-products"><tr class="state-row"><td colspan="5"><span class="spinner"></span>Loading…</td></tr></tbody></table>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════════════════
-     INVENTORY
-════════════════════════════════════════════════════════════════ -->
-<div class="tab-panel" id="tab-inventory">
-  <div class="crud-panel">
-    <div class="panel-header">
-      <div class="panel-title">Inventory</div>
-      <button class="btn btn-primary btn-sm" onclick="openAdd('inventory')">+ Add Entry</button>
-    </div>
-    <div class="table-wrap">
-      <table><thead><tr><th>#</th><th>Product</th><th>Location</th><th>Rack/Slot</th><th>Qty</th><th></th></tr></thead>
-      <tbody id="body-inventory"><tr class="state-row"><td colspan="6"><span class="spinner"></span>Loading…</td></tr></tbody></table>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════════════════
-     SCAN LOGS
-════════════════════════════════════════════════════════════════ -->
-<div class="tab-panel" id="tab-scanlogs">
-  <div class="crud-panel">
-    <div class="panel-header">
-      <div class="panel-title">Scan Logs</div>
-      <button class="btn btn-primary btn-sm" onclick="openAdd('scanlogs')">+ Add</button>
-    </div>
-    <div class="table-wrap">
-      <table><thead><tr><th>#</th><th>Robot</th><th>QR Code</th><th>Time</th><th></th></tr></thead>
-      <tbody id="body-scanlogs"><tr class="state-row"><td colspan="5"><span class="spinner"></span>Loading…</td></tr></tbody></table>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════════════════
-     ROBOT CAMERA
-════════════════════════════════════════════════════════════════ -->
-<div class="tab-panel" id="tab-camera">
-  <div class="crud-panel">
-
-    <!-- Title + controls row -->
-    <div class="panel-header">
-      <div class="panel-title">Robot Live Camera</div>
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-
-        <!-- Status badge -->
-        <div id="cam-status-badge" class="cam-badge offline">
-          <span class="cam-dot"></span>
-          <span id="cam-status-txt">Camera Offline</span>
-        </div>
-
-        <!-- Buttons -->
-        <button class="btn btn-primary btn-sm" id="btn-start-cam" onclick="startCamera()">▶ Start Camera</button>
-        <button class="btn btn-ghost   btn-sm" id="btn-stop-cam"  onclick="stopCamera()" disabled>■ Stop Camera</button>
-      </div>
-    </div>
-
-    <!-- Stream URL bar (editable so user can paste the real Pi URL later) -->
-    <div class="cam-url-bar">
-      <span class="cam-url-lbl">Stream URL</span>
-      <input id="cam-url-input" type="text" value=""
-             placeholder="/camera-proxy?robot=AMR_01 (auto-filled)"
-             spellcheck="false"/>
-      <button class="btn btn-ghost btn-sm" onclick="applyUrl()">Apply</button>
-    </div>
-
-    <!-- Video window -->
-    <div class="cam-window" id="cam-window">
-
-      <!-- Idle state (before Start is pressed) -->
-      <div class="cam-state" id="cam-idle">
-        <div class="cam-state-icon">📷</div>
-        <div class="cam-state-title">Camera Stopped</div>
-        <div class="cam-state-sub">Press <strong>Start Camera</strong> to load the stream</div>
-      </div>
-
-      <!-- Loading state -->
-      <div class="cam-state" id="cam-loading" style="display:none">
-        <div class="cam-spinner"></div>
-        <div class="cam-state-title">Connecting to camera…</div>
-        <div class="cam-state-sub" id="cam-loading-url"></div>
-      </div>
-
-      <!-- Error state -->
-      <div class="cam-state" id="cam-error" style="display:none">
-        <div class="cam-state-icon" style="color:var(--red)">⚠</div>
-        <div class="cam-state-title" style="color:var(--red)">Camera Offline</div>
-        <div class="cam-state-sub" id="cam-error-msg">Could not connect to the stream URL.</div>
-        <button class="btn btn-primary btn-sm" style="margin-top:14px" onclick="startCamera()">Retry</button>
-      </div>
-
-      <!-- Live feed container — innerHTML is nuked on stop to kill the MJPEG connection -->
-      <div id="cam-img-wrap"></div>
-    </div>
-
-    <!-- Footer info -->
-    <div class="cam-footer">
-      <span id="cam-footer-info" style="color:var(--muted)">No stream active</span>
-      <span style="color:var(--muted)">MJPEG stream · auto-scales to window</span>
-    </div>
-
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════════════════
-     ORDERS TAB
-════════════════════════════════════════════════════════════════ -->
-<div class="tab-panel" id="tab-orders">
-  <div class="crud-panel">
-    <div class="panel-header">
-      <div class="panel-title">Pick Orders</div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-primary btn-sm" onclick="openCreateOrder()">+ New Order</button>
-      </div>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr>
-          <th>#</th><th>Order Code</th><th>Robot</th><th>Status</th>
-          <th>Items</th><th>Progress</th><th>Created</th><th></th>
-        </tr></thead>
-        <tbody id="body-orders">
-          <tr class="state-row"><td colspan="8"><span class="spinner"></span>Loading…</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Order detail / pick task list  (shown when clicking an order) -->
-  <div id="order-detail-panel" style="display:none" class="crud-panel" style="margin-top:16px">
-    <div class="panel-header">
-      <div class="panel-title" id="order-detail-title">Order #—</div>
-      <button class="btn btn-ghost btn-sm" onclick="closeOrderDetail()">✕ Close</button>
-    </div>
-    <div id="order-detail-body"></div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════════════════
-     AMR CONTROL TAB
-════════════════════════════════════════════════════════════════ -->
-<div class="tab-panel" id="tab-amr">
-
-  <!-- Robot Fleet Connection Bar -->
-  <div class="ros-bar" style="flex-wrap:wrap">
-    <!-- Active robot selector -->
-    <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:260px">
-      <label style="font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Active Robot</label>
-      <select id="amr-robot-select" onchange="switchActiveRobot(this.value)" style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:11px;padding:6px 10px;outline:none">
-        <option value="">— select robot —</option>
-      </select>
-      <div class="ros-dot" id="ros-dot"></div>
-      <span class="ros-status-txt" id="ros-status-txt">Not connected</span>
-    </div>
-    <!-- Connection controls for selected robot -->
-    <div style="display:flex;align-items:center;gap:6px">
-      <label style="font-family:var(--mono);font-size:9px;color:var(--muted);white-space:nowrap">IP</label>
-      <input id="ros-ip" value="" placeholder="IP auto-filled from DB" style="width:140px;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:11px;padding:6px 10px;outline:none"/>
-      <button class="amr-btn amr-btn-accent" onclick="rosConnect()">Connect</button>
-      <button class="amr-btn amr-btn-ghost"  onclick="rosDisconnect()">Disconnect</button>
-    </div>
-    <!-- Fleet overview (mini status of all robots) -->
-    <div id="fleet-dots" style="display:flex;gap:10px;align-items:center;margin-left:auto;padding-left:12px;border-left:1px solid var(--border2)"></div>
-  </div>
-
-  <div class="amr-layout">
-
-    <!-- ── LEFT COLUMN: Controls ─────────────────────────────── -->
-    <div class="amr-col">
-
-      <!-- Mode Selector -->
-      <div class="amr-card">
-        <div class="amr-card-hdr">
-          <div class="amr-card-title">Operating Mode</div>
-        </div>
-        <div class="amr-card-body" style="padding:8px">
-          <div class="mode-toggle">
-            <button class="mode-btn active-manual" id="mode-manual-btn" onclick="setMode('manual')">🎮 Manual</button>
-            <button class="mode-btn" id="mode-auto-btn"   onclick="setMode('auto')">🤖 Auto Nav</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- EMERGENCY STOP -->
-      <button class="estop-btn" onclick="emergencyStop()">🛑 EMERGENCY STOP</button>
-
-      <!-- Teleop -->
-      <div class="amr-card">
-        <div class="amr-card-hdr">
-          <div class="amr-card-title">Manual Teleop</div>
-          <span id="teleop-mode-lbl" style="font-family:var(--mono);font-size:9px;color:var(--green)">ACTIVE</span>
-        </div>
-        <div class="amr-card-body">
-          <div class="teleop-grid">
-            <div></div>
-            <button class="t-btn" id="t-fwd"  onmousedown="teleopStart(1,0)"  onmouseup="teleopStop()" ontouchstart="teleopStart(1,0)" ontouchend="teleopStop()">▲</button>
-            <div></div>
-            <button class="t-btn" id="t-left" onmousedown="teleopStart(0,1)"  onmouseup="teleopStop()" ontouchstart="teleopStart(0,1)" ontouchend="teleopStop()">◀</button>
-            <button class="t-btn stop-btn"    onclick="emergencyStop()">■</button>
-            <button class="t-btn" id="t-right" onmousedown="teleopStart(0,-1)" onmouseup="teleopStop()" ontouchstart="teleopStart(0,-1)" ontouchend="teleopStop()">▶</button>
-            <div></div>
-            <button class="t-btn" id="t-bwd"  onmousedown="teleopStart(-1,0)" onmouseup="teleopStop()" ontouchstart="teleopStart(-1,0)" ontouchend="teleopStop()">▼</button>
-            <div></div>
-          </div>
-          <div class="speed-row">
-            <label>Linear</label>
-            <input type="range" id="sl-linear"  min="0.02" max="0.40" step="0.01" value="0.15" oninput="updateSpeedLabel()"/>
-            <span class="speed-val" id="lbl-linear">0.15</span>
-          </div>
-          <div class="speed-row">
-            <label>Angular</label>
-            <input type="range" id="sl-angular" min="0.1"  max="2.0"  step="0.05" value="0.8"  oninput="updateSpeedLabel()"/>
-            <span class="speed-val" id="lbl-angular">0.80</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Preset waypoints (quick navigation) -->
-      <div class="amr-card">
-        <div class="amr-card-hdr">
-          <div class="amr-card-title">Quick Nav — Presets</div>
-        </div>
-        <div class="amr-card-body">
-          <div class="wp-preset-grid" id="preset-list">
-            <!-- populated by JS -->
-          </div>
-          <div style="margin-top:8px">
-            <button class="amr-btn amr-btn-ghost amr-btn-full" onclick="setInitialPose()">📍 2D Pose Estimate</button>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- ── CENTER COLUMN: Map ─────────────────────────────────── -->
-    <div class="amr-map-col">
-
-      <!-- Map toolbar -->
-      <div class="map-toolbar">
-        <button class="map-tool-btn active" id="tool-nav"   onclick="setTool('nav')">🎯 Nav Goal</button>
-        <button class="map-tool-btn"        id="tool-wp"    onclick="setTool('wp')">📌 Add Waypoint</button>
-        <button class="map-tool-btn"        id="tool-pan"   onclick="setTool('pan')">✋ Pan</button>
-        <span style="font-family:var(--mono);font-size:9px;color:var(--muted);padding:0 4px">|</span>
-        <button class="map-tool-btn" onclick="mapZoom(1.2)">＋</button>
-        <button class="map-tool-btn" onclick="mapZoom(0.8)">－</button>
-        <button class="map-tool-btn" onclick="mapResetView()">⊙ Fit</button>
-        <span style="font-family:var(--mono);font-size:9px;color:var(--muted);padding:0 4px">|</span>
-        <div class="toggle-row" style="gap:6px">
-          <label class="toggle-lbl">LiDAR</label>
-          <label class="toggle"><input type="checkbox" id="tog-lidar" checked onchange="toggleLayer('lidar',this.checked)"/><span class="toggle-slider"></span></label>
-        </div>
-        <div class="toggle-row" style="gap:6px">
-          <label class="toggle-lbl">Path</label>
-          <label class="toggle"><input type="checkbox" id="tog-path" checked onchange="toggleLayer('path',this.checked)"/><span class="toggle-slider"></span></label>
-        </div>
-        <div class="toggle-row" style="gap:6px">
-          <label class="toggle-lbl">History</label>
-          <label class="toggle"><input type="checkbox" id="tog-hist" checked onchange="toggleLayer('hist',this.checked)"/><span class="toggle-slider"></span></label>
-        </div>
-        <span class="map-hint" id="map-hint">Click map to set nav goal · Drag to set orientation</span>
-      </div>
-
-      <!-- Canvas map -->
-      <div id="amr-map-wrap">
-        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.1em;pointer-events:none" id="map-overlay-msg">
-          <div style="font-size:28px;opacity:.3">🗺️</div>
-          Connect to ROS to load map
-        </div>
-      </div>
-
-      <!-- Coordinate readout -->
-      <div class="map-coords">
-        <span id="map-coord-cur">Map X: — · Y: —</span>
-        <span id="map-coord-robot">Robot: — · —  ·  Yaw: —</span>
-      </div>
-
-    </div>
-
-    <!-- ── RIGHT COLUMN: Status + Tuning ─────────────────────── -->
-    <div class="amr-col">
-
-      <!-- Navigation Status -->
-      <div class="amr-card">
-        <div class="amr-card-hdr">
-          <div class="amr-card-title">Navigation Status</div>
-          <span id="nav-state-badge" class="ns-val idle">IDLE</span>
-        </div>
-        <div class="amr-card-body">
-          <div class="nav-status">
-            <div class="ns-box">
-              <div class="ns-lbl">Goal X</div>
-              <div class="ns-val" id="ns-gx">—</div>
-            </div>
-            <div class="ns-box">
-              <div class="ns-lbl">Goal Y</div>
-              <div class="ns-val" id="ns-gy">—</div>
-            </div>
-            <div class="ns-box">
-              <div class="ns-lbl">Distance</div>
-              <div class="ns-val" id="ns-dist">—</div>
-            </div>
-            <div class="ns-box">
-              <div class="ns-lbl">Progress</div>
-              <div class="ns-val" id="ns-prog">—</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- SLAM Control -->
-      <div class="amr-card" id="slam-card">
-        <div class="amr-card-hdr">
-          <div class="amr-card-title">SLAM / Map Manager</div>
-          <span id="slam-mode-badge" class="ns-val idle" style="font-size:9px">IDLE</span>
-        </div>
-        <div class="amr-card-body">
-
-          <!-- Saved maps selector -->
-          <div style="margin-bottom:8px">
-            <label style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:3px">Saved Maps</label>
-            <div style="display:flex;gap:6px;align-items:center">
-              <select id="slam-map-select"
-                style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:12px;padding:6px 8px;border-radius:6px;outline:none">
-                <option value="">— select a saved map —</option>
-              </select>
-              <button class="amr-btn amr-btn-ghost" onclick="listMaps()" title="Refresh map list" style="padding:6px 8px">🔄</button>
-            </div>
-            <div id="slam-map-list-meta" style="margin-top:4px;font-family:var(--mono);font-size:10px;color:var(--muted)"></div>
-          </div>
-
-          <!-- Load map / Stop nav -->
-          <div style="display:flex;gap:6px;margin-bottom:10px">
-            <button class="amr-btn amr-btn-green" id="slam-load-btn" onclick="loadMap()" style="flex:1">🗺️ Load Map & Navigate</button>
-            <button class="amr-btn amr-btn-danger" id="slam-stopnav-btn" onclick="stopNav()" disabled style="flex:1">⏹ Stop Navigation</button>
-          </div>
-
-          <div style="border-top:1px solid var(--border2);margin:6px 0 8px;opacity:.4"></div>
-
-          <!-- Create new map via SLAM -->
-          <label style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:3px">Create New Map</label>
-          <div style="display:flex;gap:6px;margin-bottom:8px">
-            <button class="amr-btn amr-btn-accent" id="slam-start-btn" onclick="startSlam()" style="flex:1">▶ Start SLAM</button>
-            <button class="amr-btn amr-btn-danger"  id="slam-stop-btn"  onclick="stopSlam()" disabled style="flex:1">■ Stop SLAM</button>
-          </div>
-          <div style="display:flex;gap:6px;align-items:center">
-            <input type="text" id="slam-map-name" placeholder="map name" value="warehouse_map"
-              style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:12px;padding:6px 8px;border-radius:6px;outline:none"/>
-            <button class="amr-btn amr-btn-green" id="slam-save-btn" onclick="saveMap()" disabled>💾 Save</button>
-          </div>
-          <div id="slam-status-text" style="margin-top:6px;font-family:var(--mono);font-size:10px;color:var(--muted);min-height:16px"></div>
-        </div>
-      </div>
-
-      <!-- Mission Planner (multi-waypoint) -->
-      <div class="amr-card">
-        <div class="amr-card-hdr">
-          <div class="amr-card-title">Mission Planner</div>
-          <span style="font-family:var(--mono);font-size:10px;color:var(--muted)" id="wp-count-lbl">0 points</span>
-        </div>
-        <div class="amr-card-body">
-          <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
-            <button class="amr-btn amr-btn-green" onclick="startMission()" id="mission-start-btn">▶ Start Mission</button>
-            <button class="amr-btn amr-btn-ghost" onclick="stopMission()"  id="mission-stop-btn" disabled>■ Stop</button>
-            <button class="amr-btn amr-btn-danger"onclick="clearWaypoints()">✕ Clear</button>
-          </div>
-          <div class="wp-list" id="wp-list">
-            <div style="text-align:center;padding:16px;color:var(--muted);font-family:var(--mono);font-size:10px">
-              Switch to 📌 Add Waypoint mode then click the map
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="amr-card" style="border-color:var(--purple)">
-        <div class="amr-card-hdr">
-          <div class="amr-card-title" style="color:var(--purple)">Create Shelf Map (Permanent Save)</div>
-        </div>
-        <div class="amr-card-body">
-          <p style="font-size:10px;color:var(--muted);margin:0 0 8px 0">Move robot to shelf area, enable point mode, click map, name shelf, then save to DB.</p>
-          <div style="display:flex;gap:6px;margin-bottom:8px">
-            <button id="btn-multi-wp" class="amr-btn amr-btn-ghost" onclick="toggleMultiWaypointMode()" style="flex:2">📍 1. Enable Point Mode</button>
-            <button class="amr-btn amr-btn-ghost" onclick="clearDraftPoints()" style="flex:1">Clear Draft</button>
-          </div>
-          <div style="display:flex;gap:6px;margin-bottom:8px">
-            <button class="amr-btn amr-btn-green" onclick="saveAllDraftWaypoints()" style="flex:2">💾 2. Save All To System</button>
-            <button class="amr-btn amr-btn-danger" onclick="clearAllSavedWaypoints()" style="flex:1">🗑 Reset</button>
-          </div>
-          <div id="dynamic-waypoints-list" class="wp-list">
-            <div style="text-align:center;padding:12px;color:var(--muted);font-family:var(--mono);font-size:10px">No shelf points yet.</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- IMU -->
-      <div class="amr-card">
-        <div class="amr-card-hdr"><div class="amr-card-title">IMU — BNO055</div></div>
-        <div class="amr-card-body">
-          <div class="imu-grid">
-            <div class="imu-box">
-              <div class="imu-lbl">🧭 Yaw</div>
-              <div class="imu-val" id="imu-yaw-deg">0.00°</div>
-            </div>
-            <div class="imu-box">
-              <div class="imu-lbl">θ Theta (rad)</div>
-              <div class="imu-val" id="imu-yaw-rad" style="color:var(--red)">0.000</div>
-            </div>
-            <div class="imu-box">
-              <div class="imu-lbl">Robot X</div>
-              <div class="imu-val" id="imu-px" style="color:var(--green)">—</div>
-            </div>
-            <div class="imu-box">
-              <div class="imu-lbl">Robot Y</div>
-              <div class="imu-val" id="imu-py" style="color:var(--green)">—</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- PID Tuning -->
-      <div class="amr-card">
-        <div class="amr-card-hdr">
-          <div class="amr-card-title">PID — STM32 Motor</div>
-        </div>
-        <div class="amr-card-body">
-          <div class="pid-grid" style="margin-bottom:4px">
-            <div class="pid-field">
-              <label>Kp</label>
-              <div class="pid-row"><input type="number" id="pid-kp" value="700.0" step="10"/></div>
-            </div>
-            <div class="pid-field">
-              <label>Ki</label>
-              <div class="pid-row"><input type="number" id="pid-ki" value="300.0" step="10"/></div>
-            </div>
-            <div class="pid-field">
-              <label>Kd</label>
-              <div class="pid-row"><input type="number" id="pid-kd" value="0.0" step="1"/></div>
-            </div>
-          </div>
-          <div class="pid-meta">Message format: PID,Kp,Ki,Kd</div>
-          <button class="amr-btn amr-btn-accent amr-btn-full" onclick="sendPID()">⚙ Upload PID to STM32</button>
-          <div class="pid-controls">
-            <input type="number" id="test-speed-amr" value="0.20" step="0.05" class="pid-speed"/>
-            <button class="amr-btn amr-btn-green" style="flex:1" onclick="pidTestRun()">▲ Test Run</button>
-            <button class="amr-btn amr-btn-danger"style="flex:1" onclick="pidTestStop()">■ Stop</button>
-          </div>
-          <div style="margin-top:10px">
-            <div class="chart-box pid-chart-box"><div class="chart-box-lbl">L-WHEEL  <span style="color:#e74c3c">— target</span>  <span style="color:#3b9eff">— actual</span></div><canvas id="chartAMR-L"></canvas></div>
-            <div class="chart-box pid-chart-box"><div class="chart-box-lbl">R-WHEEL</div><canvas id="chartAMR-R"></canvas></div>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════════════════
-     SIMULATION TAB
-════════════════════════════════════════════════════════════════ -->
-<div class="tab-panel" id="tab-sim">
-
-  <!-- Sidebar -->
-  <div class="sim-sidebar">
-
-    <!-- URDF Upload -->
-    <div class="sim-panel">
-      <div class="sim-panel-title">Robot Model (URDF)</div>
-      <div class="sim-file-drop" id="sim-urdf-drop"
-           onclick="document.getElementById('sim-urdf-input').click()">
-        📦 Drop URDF file here or click to browse
-      </div>
-      <input type="file" id="sim-urdf-input" accept=".urdf,.xacro,.xml" style="display:none"/>
-      <div id="sim-urdf-name" style="margin-top:6px;font-family:var(--mono);font-size:10px;color:var(--green);min-height:14px"></div>
-      <div style="margin-top:8px">
-        <label style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:3px">Or load from URL</label>
-        <div style="display:flex;gap:6px">
-          <input type="text" id="sim-urdf-url" placeholder="https://…/robot.urdf"
-            style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:11px;padding:6px 8px;border-radius:6px;outline:none"/>
-          <button class="sim-btn sim-btn-primary" onclick="simLoadUrdfFromUrl()">Load</button>
-        </div>
-      </div>
-      <div style="margin-top:8px">
-        <button class="sim-btn sim-btn-ghost" style="width:100%" onclick="simLoadDefaultRobot()">🤖 Load TurtleBot3 (Built-in)</button>
-      </div>
-    </div>
-
-    <!-- Scene Controls -->
-    <div class="sim-panel">
-      <div class="sim-panel-title">Scene</div>
-      <div class="sim-row">
-        <button class="sim-btn sim-btn-ghost" onclick="simToggleGrid()" id="sim-grid-btn" style="flex:1">Grid: ON</button>
-        <button class="sim-btn sim-btn-ghost" onclick="simToggleAxes()" id="sim-axes-btn" style="flex:1">Axes: ON</button>
-      </div>
-      <div class="sim-row">
-        <button class="sim-btn sim-btn-ghost" onclick="simToggleLidar()" id="sim-lidar-btn" style="flex:1">LiDAR: ON</button>
-        <button class="sim-btn sim-btn-ghost" onclick="simTogglePath()" id="sim-path-btn" style="flex:1">Path: ON</button>
-      </div>
-      <div class="sim-row">
-        <button class="sim-btn sim-btn-ghost" onclick="simToggleWaypoints()" id="sim-wp-btn" style="flex:1">Waypts: ON</button>
-        <button class="sim-btn sim-btn-ghost" onclick="simToggleMap()" id="sim-map-btn" style="flex:1">Map: OFF</button>
-      </div>
-      <div class="sim-row">
-        <button class="sim-btn sim-btn-ghost" onclick="simResetCamera()" style="flex:1">⊙ Reset View</button>
-      </div>
-      <div class="sim-row">
-        <span class="sim-lbl">BG Color</span>
-        <input type="color" id="sim-bg-color" value="#0d1117" onchange="simSetBg(this.value)"
-          style="width:32px;height:24px;border:1px solid var(--border2);border-radius:4px;background:none;cursor:pointer"/>
-      </div>
-    </div>
-
-    <!-- Robot Fleet -->
-    <div class="sim-panel">
-      <div class="sim-panel-title">Robot Fleet</div>
-      <div id="sim-robot-list">
-        <div style="color:var(--muted);font-family:var(--mono);font-size:10px;padding:8px;text-align:center">
-          Connect to robots in AMR tab first
-        </div>
-      </div>
-    </div>
-
-    <!-- Pose Information -->
-    <div class="sim-panel">
-      <div class="sim-panel-title">Pose</div>
-      <div class="sim-row"><span class="sim-lbl">X</span><span class="sim-val" id="sim-pose-x">—</span></div>
-      <div class="sim-row"><span class="sim-lbl">Y</span><span class="sim-val" id="sim-pose-y">—</span></div>
-      <div class="sim-row"><span class="sim-lbl">Yaw</span><span class="sim-val" id="sim-pose-yaw">—</span></div>
-      <div class="sim-row"><span class="sim-lbl">Mode</span><span class="sim-val" id="sim-mode-txt">Orbit</span></div>
-    </div>
-
-    <!-- Interaction -->
-    <div class="sim-panel">
-      <div class="sim-panel-title">Interaction</div>
-      <div class="sim-row">
-        <button class="sim-btn sim-btn-green" id="sim-goal-btn" onclick="simToggleGoalMode()" style="flex:1">🎯 Click to Set Goal</button>
-      </div>
-      <div class="sim-row">
-        <button class="sim-btn sim-btn-ghost" onclick="simFollowRobot()" style="flex:1">📍 Follow Robot</button>
-        <button class="sim-btn sim-btn-ghost" onclick="simTopView()" style="flex:1">⬆ Top View</button>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- 3D Viewport -->
-  <div class="sim-viewport">
-    <canvas id="sim-canvas"></canvas>
-    <!-- HUD overlay -->
-    <div class="sim-overlay">
-      <div class="sim-hud" id="sim-fps-hud">FPS: —</div>
-      <div class="sim-hud" id="sim-cursor-hud">World: — , —</div>
-    </div>
-    <svg class="sim-crosshair" id="sim-crosshair" viewBox="0 0 20 20">
-      <line x1="10" y1="2" x2="10" y2="8" stroke="#00e0ff" stroke-width="1"/>
-      <line x1="10" y1="12" x2="10" y2="18" stroke="#00e0ff" stroke-width="1"/>
-      <line x1="2" y1="10" x2="8" y2="10" stroke="#00e0ff" stroke-width="1"/>
-      <line x1="12" y1="10" x2="18" y2="10" stroke="#00e0ff" stroke-width="1"/>
-    </svg>
-  </div>
-
-</div>
-
-<!-- ══════════════════════════════════════════════════════════════
-     MODALS
-════════════════════════════════════════════════════════════════ -->
-<div class="modal-backdrop" id="form-modal">
-  <div class="modal" id="form-modal-inner">
-    <div class="modal-header">
-      <div class="modal-title" id="modal-title">Add</div>
-      <button class="modal-close" onclick="closeModal('form-modal')">×</button>
-    </div>
-    <div class="modal-body" id="modal-body"></div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('form-modal')">Cancel</button>
-      <button class="btn btn-primary" id="modal-save" onclick="saveRecord()">Save</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-backdrop" id="del-modal">
-  <div class="modal danger">
-    <div class="modal-header">
-      <div class="modal-title danger">Confirm Delete</div>
-      <button class="modal-close" onclick="closeModal('del-modal')">×</button>
-    </div>
-    <div class="modal-body"><p class="confirm-msg" id="del-msg"></p></div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('del-modal')">Cancel</button>
-      <button class="btn btn-danger" id="del-ok">Delete</button>
-    </div>
-  </div>
-</div>
-
-<!-- Pallet Lift Warning Light (global, visible from any tab) -->
-<div id="pallet-lift-badge">
-  <div id="pallet-lift-light" class="idle"></div>
-  <div id="pallet-lift-label">PALLET LIFT</div>
-  <div id="pallet-lift-sub">—</div>
-</div>
-
-<div id="toast"></div>
-
-<!-- ══════════════════════════════════════════════════════════════
-     JAVASCRIPT
-════════════════════════════════════════════════════════════════ -->
-<script>
-// Dynamic origin — works on localhost, LAN, or over the internet (tunnel/VPS)
+﻿
+// Dynamic origin â€” works on localhost, LAN, or over the internet (tunnel/VPS)
 const API    = location.origin;
 const WS_URL = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/ws';
 
-/* ── State ─────────────────────────────────────────────────── */
+/* â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 let feed       = [];          // array of enriched scan objects (max 20)
 let _products  = [];
 let _locations = [];
@@ -1615,9 +11,8 @@ let _robots    = [];
 let editCache  = { robots:{}, locations:{}, products:{}, inventory:{} };
 let modalCtx   = {};
 let ws         = null;
-let wsConnectWatchdog = null;
 
-/* ── Pallet Lift Warning Light ─────────────────────────────── */
+/* â”€â”€ Pallet Lift Warning Light â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 let _palletLiftTimer = null;
 function showPalletLift(state, location) {
   // state: 'lifting' | 'lifted' | 'idle'
@@ -1628,23 +23,23 @@ function showPalletLift(state, location) {
   clearTimeout(_palletLiftTimer);
   if (state === 'idle') { badge.style.display = 'none'; return; }
   light.className   = state;
-  label.textContent = state === 'lifting' ? '⚡ PALLET LIFTING'
-                    : state === 'lifted'  ? '✔ PALLET LIFTED'
-                    : state === 'wrong'   ? '✖ WRONG SHELF'
+  label.textContent = state === 'lifting' ? 'âš¡ PALLET LIFTING'
+                    : state === 'lifted'  ? 'âœ” PALLET LIFTED'
+                    : state === 'wrong'   ? 'âœ– WRONG SHELF'
                     : 'PALLET LIFT';
-  sub.textContent   = location || '—';
+  sub.textContent   = location || 'â€”';
   badge.style.display = 'flex';
   if (state === 'lifted') {
     _palletLiftTimer = setTimeout(() => showPalletLift('idle'), 4000);
   }
 }
 
-/* ── Clock ─────────────────────────────────────────────────── */
+/* â”€â”€ Clock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 setInterval(() => {
   document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB');
 }, 1000);
 
-/* ── Tabs ──────────────────────────────────────────────────── */
+/* â”€â”€ Tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1657,28 +52,13 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-/* ════════════════════════════════════════════════════════════
-   WEBSOCKET — real-time connection
-════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   WEBSOCKET â€” real-time connection
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function connectWS() {
-  // Avoid opening duplicate sockets during reconnect storms.
-  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
-
   ws = new WebSocket(WS_URL);
 
-  if (wsConnectWatchdog) clearTimeout(wsConnectWatchdog);
-  wsConnectWatchdog = setTimeout(() => {
-    // Some environments can get stuck at CONNECTING forever; force a clean retry.
-    if (ws && ws.readyState === WebSocket.CONNECTING) {
-      console.warn('[WS] Connect watchdog timeout — forcing reconnect');
-      try { ws.close(); } catch (e) {}
-      setWsBadge(false);
-      setTimeout(connectWS, 500);
-    }
-  }, 4000);
-
   ws.onopen = () => {
-    if (wsConnectWatchdog) { clearTimeout(wsConnectWatchdog); wsConnectWatchdog = null; }
     setWsBadge(true);
     console.log('[WS] Connected');
     // Clear the initial "Connecting to server" placeholder even before history arrives.
@@ -1701,39 +81,38 @@ function connectWS() {
       renderFeed(false);
       updateStats();
     } else if (msg.type === 'scan') {
-      // New scan from robot — prepend to feed
+      // New scan from robot â€” prepend to feed
       feed.unshift(msg.data);
       if (feed.length > 20) feed.pop();
       updateSpotlight(msg.data, true);
       renderFeed(true);
       updateStats();
-    } else if (['order_created','order_dispatched','pick_arrived','pick_scanned','pick_completed','order_completed','pick_wrong_shelf','pick_no_task'].includes(msg.type)) {
-      // Any order event → refresh orders table
+    } else if (['order_created','order_dispatched','pick_scanned','pick_completed','order_completed','pick_wrong_shelf','pick_no_task'].includes(msg.type)) {
+      // Any order event â†’ refresh orders table
       loadOrders();
       if (msg.type === 'pick_scanned') {
-        toast('📦 QR verified at ' + (msg.location ?? '') + ' — lifting pallet…', 'ok');
+        toast('ðŸ“¦ QR verified at ' + (msg.location ?? '') + ' â€” lifting palletâ€¦', 'ok');
         showPalletLift('lifting', msg.location ?? '');
       }
       if (msg.type === 'pick_completed') {
         showPalletLift('lifted', 'Pick complete');
       }
       if (msg.type === 'order_completed') {
-        toast('✅ Order complete — all pallets lifted!', 'ok');
+        toast('âœ… Order complete â€” all pallets lifted!', 'ok');
         showPalletLift('lifted', 'Order complete');
       }
       if (msg.type === 'pick_wrong_shelf') {
         const scanned  = msg.scanned  ?? '?';
         const expected = msg.expected ?? '?';
-        toast('⚠ WRONG SHELF — scanned ' + scanned + ', expected ' + expected, 'err');
-        showPalletLift('wrong', 'Scanned: ' + scanned + '  ✕  Expected: ' + expected);
+        toast('âš  WRONG SHELF â€” scanned ' + scanned + ', expected ' + expected, 'err');
+        showPalletLift('wrong', 'Scanned: ' + scanned + '  âœ•  Expected: ' + expected);
       }
     }
   };
 
   ws.onclose = () => {
-    if (wsConnectWatchdog) { clearTimeout(wsConnectWatchdog); wsConnectWatchdog = null; }
     setWsBadge(false);
-    console.log('[WS] Disconnected — retrying in 3s…');
+    console.log('[WS] Disconnected â€” retrying in 3sâ€¦');
     setTimeout(connectWS, 3000);    // auto-reconnect
   };
 
@@ -1748,20 +127,20 @@ function setWsBadge(online) {
   document.getElementById('ws-label').textContent = online ? 'LIVE' : 'OFFLINE';
 }
 
-/* ════════════════════════════════════════════════════════════
-   SPOTLIGHT — big card for the latest scan
-════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   SPOTLIGHT â€” big card for the latest scan
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function updateSpotlight(d, animate = false) {
   document.getElementById('spot-empty').style.display = 'none';
   document.getElementById('scan-card').style.display  = 'flex';
 
-  setText('v-robot', d.robot_code  || '—', !!d.robot_code);
-  setText('v-loc',   d.qr_code     || '—', !!d.qr_code);
+  setText('v-robot', d.robot_code  || 'â€”', !!d.robot_code);
+  setText('v-loc',   d.qr_code     || 'â€”', !!d.qr_code);
   document.getElementById('v-rack').textContent =
-    (d.rack && d.slot) ? `Rack ${d.rack}  ·  Slot ${d.slot}` : '';
+    (d.rack && d.slot) ? `Rack ${d.rack}  Â·  Slot ${d.slot}` : '';
 
   const hasProd = !!(d.product_name || d.product_code);
-  setText('v-prod', d.product_name || d.product_code || '—', hasProd);
+  setText('v-prod', d.product_name || d.product_code || 'â€”', hasProd);
   document.getElementById('v-cat').textContent = d.category || '';
 
   const hasQty = d.quantity != null;
@@ -1770,7 +149,7 @@ function updateSpotlight(d, animate = false) {
   qtyEl.className    = 'card-value qty' + (hasQty ? '' : ' na');
 
   document.getElementById('v-id').textContent   = '#' + (d.id || '?');
-  document.getElementById('v-time').textContent = d.scan_time || '—';
+  document.getElementById('v-time').textContent = d.scan_time || 'â€”';
 
   if (animate) {
     const sp = document.getElementById('spotlight');
@@ -1785,9 +164,9 @@ function setText(id, val, hasData) {
   el.textContent = val;
 }
 
-/* ════════════════════════════════════════════════════════════
-   HISTORY FEED — grid of small cards
-════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   HISTORY FEED â€” grid of small cards
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function renderFeed(highlightFirst = false) {
   const grid = document.getElementById('feed-grid');
   if (!feed.length) {
@@ -1801,10 +180,10 @@ function renderFeed(highlightFirst = false) {
     return `
     <div class="h-card${isNew ? ' new' : ''}">
       <div class="h-card-top">
-        <span class="h-robot">${esc(d.robot_code || '—')}</span>
+        <span class="h-robot">${esc(d.robot_code || 'â€”')}</span>
         <span class="h-time">${esc(timeOnly(d.scan_time))}</span>
       </div>
-      <div class="h-loc">${esc(loc || '—')}</div>
+      <div class="h-loc">${esc(loc || 'â€”')}</div>
       ${prod
         ? `<div class="h-prod">${esc(prod)}</div>
            <div class="h-qty">Qty: <span>${esc(d.quantity ?? 'N/A')}</span></div>`
@@ -1815,23 +194,23 @@ function renderFeed(highlightFirst = false) {
 }
 
 function timeOnly(dt) {
-  if (!dt) return '—';
+  if (!dt) return 'â€”';
   const parts = dt.split(' ');
   return parts.length > 1 ? parts[1] : dt;
 }
 
-/* ════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    STATS
-════════════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function updateStats() {
   document.getElementById('s-total').textContent  = feed.length;
   document.getElementById('s-robots').textContent = new Set(feed.map(r => r.robot_code)).size;
   document.getElementById('s-locs').textContent   = new Set(feed.map(r => r.qr_code)).size;
 }
 
-/* ════════════════════════════════════════════════════════════
-   CRUD — fetch & render tables
-════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   CRUD â€” fetch & render tables
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 async function api(path, opts = {}) {
   const res = await fetch(API + path, {headers:{'Content-Type':'application/json'}, ...opts});
   if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.detail || `HTTP ${res.status}`); }
@@ -1866,10 +245,10 @@ function renderRobots(data) {
     return `<tr>
       <td class="id">${esc(r.id)}</td>
       <td class="code">${esc(r.robot_code)}</td>
-      <td>${esc(r.description??'—')}</td>
+      <td>${esc(r.description??'â€”')}</td>
       <td><span class="order-status ${stCls(r.status)}">${esc(r.status??'IDLE')}</span></td>
-      <td style="font-family:var(--mono);font-size:11px">${esc(r.ip_address??'—')}</td>
-      <td style="font-size:11px;font-family:var(--mono)">${r.home_x != null ? Number(r.home_x).toFixed(3) : '—'}, ${r.home_y != null ? Number(r.home_y).toFixed(3) : '—'}</td>
+      <td style="font-family:var(--mono);font-size:11px">${esc(r.ip_address??'â€”')}</td>
+      <td style="font-size:11px;font-family:var(--mono)">${r.home_x != null ? Number(r.home_x).toFixed(3) : 'â€”'}, ${r.home_y != null ? Number(r.home_y).toFixed(3) : 'â€”'}</td>
       <td class="acts">
         <button class="btn btn-ghost btn-sm" onclick="openEdit('robots',${r.id})">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="confirmDel('robots',${r.id},'${esc(r.robot_code)}')">Del</button>
@@ -1888,9 +267,9 @@ function renderLocations(data) {
     return `<tr>
       <td class="id">${esc(r.id)}</td>
       <td class="code">${esc(r.location_code)}</td>
-      <td>${esc(r.rack??'—')}</td>
-      <td>${esc(r.slot??'—')}</td>
-      <td style="font-family:var(--mono);font-size:11px">${r.loc_x != null ? Number(r.loc_x).toFixed(3) : '—'}, ${r.loc_y != null ? Number(r.loc_y).toFixed(3) : '—'}, ${r.loc_yaw != null ? Number(r.loc_yaw).toFixed(2) : '—'}</td>
+      <td>${esc(r.rack??'â€”')}</td>
+      <td>${esc(r.slot??'â€”')}</td>
+      <td style="font-family:var(--mono);font-size:11px">${r.loc_x != null ? Number(r.loc_x).toFixed(3) : 'â€”'}, ${r.loc_y != null ? Number(r.loc_y).toFixed(3) : 'â€”'}, ${r.loc_yaw != null ? Number(r.loc_yaw).toFixed(2) : 'â€”'}</td>
       <td class="acts">
         <button class="btn btn-ghost btn-sm" onclick="openEdit('locations',${r.id})">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="confirmDel('locations',${r.id},'${esc(r.location_code)}')">Del</button>
@@ -1908,8 +287,8 @@ function renderProducts(data) {
     return `<tr>
       <td class="id">${esc(r.id)}</td>
       <td class="code">${esc(r.product_code)}</td>
-      <td>${esc(r.name??'—')}</td>
-      <td>${esc(r.category??'—')}</td>
+      <td>${esc(r.name??'â€”')}</td>
+      <td>${esc(r.category??'â€”')}</td>
       <td class="acts">
         <button class="btn btn-ghost btn-sm" onclick="openEdit('products',${r.id})">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="confirmDel('products',${r.id},'${esc(r.product_code)}')">Del</button>
@@ -1926,8 +305,8 @@ function renderInventory(data) {
     editCache.inventory[r.id] = r;
     return `<tr>
       <td class="id">${esc(r.id)}</td>
-      <td class="code">${esc(r.product_code??'—')} <small style="color:var(--muted)">${esc(r.product_name??'')}</small></td>
-      <td>${esc(r.location_code??'—')}</td>
+      <td class="code">${esc(r.product_code??'â€”')} <small style="color:var(--muted)">${esc(r.product_name??'')}</small></td>
+      <td>${esc(r.location_code??'â€”')}</td>
       <td style="color:var(--muted)">${esc(r.rack??'')}/${esc(r.slot??'')}</td>
       <td class="qty">${esc(r.quantity)}</td>
       <td class="acts">
@@ -1956,9 +335,9 @@ function emptyRow(tb, cols) {
   tb.innerHTML = `<tr class="state-row"><td colspan="${cols}">No records.</td></tr>`;
 }
 
-/* ════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    MODAL FORMS
-════════════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 const FORMS = {
   robots: () => `<div class="form-grid">
     <div class="field full"><label>Robot Code *</label><input id="f0" placeholder="AMR_01"/></div>
@@ -1986,11 +365,11 @@ const FORMS = {
   </div>`,
 
   inventory: () => {
-    const pOpts = _products.map(p => `<option value="${p.id}">${esc(p.product_code)} — ${esc(p.name??'')}</option>`).join('');
+    const pOpts = _products.map(p => `<option value="${p.id}">${esc(p.product_code)} â€” ${esc(p.name??'')}</option>`).join('');
     const lOpts = _locations.map(l => `<option value="${l.id}">${esc(l.location_code)} (${esc(l.rack)}/${esc(l.slot)})</option>`).join('');
     return `<div class="form-grid one">
-      <div class="field"><label>Product *</label><select id="f0"><option value="">— select —</option>${pOpts}</select></div>
-      <div class="field"><label>Location *</label><select id="f1"><option value="">— select —</option>${lOpts}</select></div>
+      <div class="field"><label>Product *</label><select id="f0"><option value="">â€” select â€”</option>${pOpts}</select></div>
+      <div class="field"><label>Location *</label><select id="f1"><option value="">â€” select â€”</option>${lOpts}</select></div>
       <div class="field"><label>Quantity *</label><input id="f2" type="number" min="0" placeholder="0"/></div>
     </div>`;
   },
@@ -2003,7 +382,7 @@ const FORMS = {
 
 function openAdd(table) {
   modalCtx = { table, mode: 'add', id: null };
-  document.getElementById('modal-title').textContent = 'Add — ' + table;
+  document.getElementById('modal-title').textContent = 'Add â€” ' + table;
   document.getElementById('modal-body').innerHTML = FORMS[table]();
   document.getElementById('modal-save').textContent = 'Create';
   document.getElementById('form-modal').classList.add('open');
@@ -2013,7 +392,7 @@ function openEdit(table, id, row) {
   row = row || editCache[table]?.[id];
   if (!row) { toast('Unable to load record for edit', 'err'); return; }
   modalCtx = { table, mode: 'edit', id };
-  document.getElementById('modal-title').textContent = 'Edit — ' + table + ' #' + id;
+  document.getElementById('modal-title').textContent = 'Edit â€” ' + table + ' #' + id;
   document.getElementById('modal-body').innerHTML = FORMS[table]();
   document.getElementById('modal-save').textContent = 'Update';
   document.getElementById('form-modal').classList.add('open');
@@ -2065,7 +444,7 @@ async function saveRecord() {
   } catch(e) { toast(e.message,'err'); }
 }
 
-/* ── Delete ────────────────────────────────────────────────── */
+/* â”€â”€ Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function confirmDel(table, id, label) {
   document.getElementById('del-msg').innerHTML = `Delete <strong>${label}</strong>? This cannot be undone.`;
   document.getElementById('del-modal').classList.add('open');
@@ -2079,7 +458,7 @@ function confirmDel(table, id, label) {
   };
 }
 
-/* ── Modal utils ───────────────────────────────────────────── */
+/* â”€â”€ Modal utils â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.modal-backdrop').forEach(el =>
   el.addEventListener('click', e => { if(e.target===el) closeModal(el.id); })
@@ -2088,25 +467,25 @@ document.addEventListener('keydown', e => {
   if (e.key==='Escape') { closeModal('form-modal'); closeModal('del-modal'); }
 });
 
-/* ── Helpers ───────────────────────────────────────────────── */
+/* â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function jq(r) { return JSON.stringify(r).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"'); }
 
 let toastT;
 function toast(msg, type='ok') {
   const el = document.getElementById('toast');
-  el.textContent = (type==='ok'?'✓ ':'✗ ') + msg;
+  el.textContent = (type==='ok'?'âœ“ ':'âœ— ') + msg;
   el.className = type;
   el.style.display = 'block';
   clearTimeout(toastT);
   toastT = setTimeout(()=>{ el.style.display='none'; }, 3000);
 }
 
-/* ════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    CAMERA
-════════════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-// Camera streams through the server proxy — no direct Pi connection needed.
+// Camera streams through the server proxy â€” no direct Pi connection needed.
 // Default URL uses the proxy; user can override with a direct URL if on LAN.
 let MJPEG_URL = '';
 
@@ -2142,7 +521,7 @@ function applyUrl() {
   if (!val) return;
   MJPEG_URL = normalizeCameraUrl(val);
   document.getElementById('cam-url-input').value = MJPEG_URL;
-  toast('Stream URL updated — press Start Camera to connect');
+  toast('Stream URL updated â€” press Start Camera to connect');
   // If stream is currently running, restart with new URL
   if (camActive) startCamera();
 }
@@ -2199,7 +578,7 @@ function stopCamera() {
   camStreamToken += 1;
   clearTimeout(camLoadTimer);
 
-  // Nuke the wrapper innerHTML — the ONLY reliable way to abort an MJPEG stream
+  // Nuke the wrapper innerHTML â€” the ONLY reliable way to abort an MJPEG stream
   document.getElementById('cam-img-wrap').innerHTML = '';
 
   showCamState('idle');
@@ -2211,18 +590,18 @@ function stopCamera() {
 
 function onCamLoad(token = camStreamToken) {
   if (!camActive || token !== camStreamToken) return;
-  // img fired onload — stream is alive
+  // img fired onload â€” stream is alive
   clearTimeout(camLoadTimer);
   showCamState('stream');
   setCamBadge('online');
   document.getElementById('cam-footer-info').textContent =
-    '● Streaming from ' + MJPEG_URL;
+    'â— Streaming from ' + MJPEG_URL;
 }
 
 function onCamError(token = camStreamToken) {
   // img fired onerror, or our timeout fired
   clearTimeout(camLoadTimer);
-  if (!camActive || token !== camStreamToken) return;           // user stopped manually — ignore
+  if (!camActive || token !== camStreamToken) return;           // user stopped manually â€” ignore
 
   document.getElementById('cam-img').style.display = 'none';
   document.getElementById('cam-error-msg').textContent =
@@ -2255,7 +634,7 @@ function setCamBadge(state) {
     txt.textContent  = 'Camera Online';
   } else if (state === 'connecting') {
     badge.className  = 'cam-badge offline';
-    txt.textContent  = 'Connecting…';
+    txt.textContent  = 'Connectingâ€¦';
   } else {
     badge.className  = 'cam-badge offline';
     txt.textContent  = 'Camera Offline';
@@ -2280,12 +659,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   }
 });
 
-/* ════════════════════════════════════════════════════════════
-   AMR CONTROL — ROS2 / Nav2 Integration
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   AMR CONTROL â€” ROS2 / Nav2 Integration
    Requires: roslib.min.js, eventemitter2.min.js, chart.js
-════════════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-// ── Dynamic script loader (load ROS libs on demand) ──────────
+// â”€â”€ Dynamic script loader (load ROS libs on demand) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function loadScript(src, cb) {
   if (document.querySelector(`script[src="${src}"]`)) { cb && cb(); return; }
   const s = document.createElement('script'); s.src = src;
@@ -2306,7 +685,7 @@ function ensureRosLibs(cb) {
   });
 }
 
-// ── State ─────────────────────────────────────────────────────
+// â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let ros = null;
 let rosConnected = false;
 
@@ -2326,13 +705,10 @@ let mapListRetryTimer = null;
 let mapLoadRequestToken = 0;
 let mapSwitchInProgress = false;
 let mapSwitchTargetName = '';
-let mapSwitchWarningTimer = null;
 let mapSwitchTimeoutTimer = null;
 let mapSwitchNavConfirmed = false;
 let mapSwitchHasMapFrame = false;
 let mapSwitchMapFrameTimer = null;
-const MAP_SWITCH_WARNING_MS = 15000;
-const MAP_SWITCH_HARD_TIMEOUT_MS = 45000;
 
 function normalizeMapName(name) {
   return String(name || '')
@@ -2356,10 +732,6 @@ function completeMapSwitch(successText) {
     clearTimeout(mapSwitchMapFrameTimer);
     mapSwitchMapFrameTimer = null;
   }
-  if (mapSwitchWarningTimer) {
-    clearTimeout(mapSwitchWarningTimer);
-    mapSwitchWarningTimer = null;
-  }
   if (mapSwitchTimeoutTimer) {
     clearTimeout(mapSwitchTimeoutTimer);
     mapSwitchTimeoutTimer = null;
@@ -2380,8 +752,6 @@ let goalX = null, goalY = null;
 let goalInitX = null;              // goal origin for distance calc
 let goalInitY = null;              // goal origin for distance calc
 let navState = 'IDLE';             // IDLE | NAVIGATING | SUCCESS | FAILED
-let emergencyStopActive = false;
-let emergencyStopTimer = null;
 let localizationReady = false;
 let localizationRequested = false;
 let localizationWaitTimer = null;
@@ -2392,10 +762,9 @@ let poseHistory = [];
 const MAX_HISTORY = 500;
 
 // Mission waypoints
-let missionWaypoints = [];         // [{x,y,yaw,pickTaskId,orderId,label}]
+let missionWaypoints = [];         // [{x,y,yaw}]
 let missionActive = false;
 let missionIndex  = 0;
-let missionGoalPending = false;
 
 // Map / canvas state
 let mapCanvas = null, mapCtx = null;
@@ -2410,7 +779,7 @@ let mapPanOffset  = { x: 0, y: 0 };
 let isPanning     = false;
 let panStart      = { x: 0, y: 0 };
 
-// Map interaction — 'nav' | 'wp' | 'pan'
+// Map interaction â€” 'nav' | 'wp' | 'pan'
 let activeTool = 'nav';
 let isDragging = false;
 let dragStart  = null;             // {x,y} map coords at mousedown
@@ -2440,13 +809,13 @@ const MAX_CHART_PTS = 50;
 // Preset waypoints intentionally empty: runtime points come from saved map data.
 const PRESETS = [];
 
-// ── Multi-robot fleet UI ──────────────────────────────────────
+// â”€â”€ Multi-robot fleet UI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function populateRobotSelect() {
   const sel = document.getElementById('amr-robot-select');
   const prev = sel.value;
-  sel.innerHTML = '<option value="">— select robot —</option>' +
-    _robots.map(r => `<option value="${esc(r.robot_code)}">${esc(r.robot_code)} — ${esc(r.description ?? '')}</option>`).join('');
+  sel.innerHTML = '<option value="">â€” select robot â€”</option>' +
+    _robots.map(r => `<option value="${esc(r.robot_code)}">${esc(r.robot_code)} â€” ${esc(r.description ?? '')}</option>`).join('');
   // restore previous selection
   if (prev && _robots.some(r => r.robot_code === prev)) sel.value = prev;
   renderFleetDots();
@@ -2459,8 +828,8 @@ function renderFleetDots() {
     const conn = rosConnections[r.robot_code];
     const on = conn?.connected;
     const mode = conn?.mode || '';
-    const modeIcon = mode.includes('Cloud') ? '☁️' : (on ? '🔗' : '');
-    return `<div style="display:flex;align-items:center;gap:3px;cursor:pointer" title="${esc(r.robot_code)} — ${on ? (mode || 'Connected') : 'Offline'}${r.ip_address ? ' ('+esc(r.ip_address)+')' : ''}" onclick="document.getElementById('amr-robot-select').value='${esc(r.robot_code)}';switchActiveRobot('${esc(r.robot_code)}')">
+    const modeIcon = mode.includes('Cloud') ? 'â˜ï¸' : (on ? 'ðŸ”—' : '');
+    return `<div style="display:flex;align-items:center;gap:3px;cursor:pointer" title="${esc(r.robot_code)} â€” ${on ? (mode || 'Connected') : 'Offline'}${r.ip_address ? ' ('+esc(r.ip_address)+')' : ''}" onclick="document.getElementById('amr-robot-select').value='${esc(r.robot_code)}';switchActiveRobot('${esc(r.robot_code)}')">
       <div class="ros-dot${on ? ' on' : ''}" style="width:6px;height:6px"></div>
       <span style="font-family:var(--mono);font-size:9px;color:${on ? 'var(--green)' : 'var(--muted)'}">${modeIcon} ${esc(r.robot_code)}</span>
     </div>`;
@@ -2478,7 +847,7 @@ function switchActiveRobot(code) {
   if (conn?.connected) {
     ros = conn.ros;
     rosConnected = true;
-    rosSetStatus('Connected — ' + (robot?.ip_address ?? code), true);
+    rosSetStatus('Connected â€” ' + (robot?.ip_address ?? code), true);
     setupTopics();
     initAMRMap();
   } else {
@@ -2489,7 +858,7 @@ function switchActiveRobot(code) {
   renderFleetDots();
 }
 
-// ── ROS connection ────────────────────────────────────────────
+// â”€â”€ ROS connection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function rosConnect() {
   const code = activeRobotCode;
@@ -2510,7 +879,7 @@ function rosConnect() {
       try { rosConnections[code].ros.close(); } catch(e) {}
     }
 
-    rosSetStatus('Connecting…', false);
+    rosSetStatus('Connectingâ€¦', false);
     // Connect via server-side proxy instead of directly to the Pi
     const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const proxyUrl = wsProto + '//' + location.host + '/ros-proxy?robot=' + encodeURIComponent(code);
@@ -2522,24 +891,21 @@ function rosConnect() {
       rosConnections[code].connected = true;
       // Detect connection mode (Cloud Bridge vs LAN)
       fetch(API + '/robot-agents').then(r => r.json()).then(agents => {
-        const mode = agents[code] ? '☁️ Cloud Bridge' : '🔗 LAN';
+        const mode = agents[code] ? 'â˜ï¸ Cloud Bridge' : 'ðŸ”— LAN';
         rosConnections[code].mode = mode;
         if (activeRobotCode === code) {
-          rosSetStatus(mode + ' — ' + ip, true);
+          rosSetStatus(mode + ' â€” ' + ip, true);
         }
         renderFleetDots();
       }).catch(() => renderFleetDots());
       if (activeRobotCode === code) {
         ros = newRos;
         rosConnected = true;
-        rosSetStatus('Connected — ' + ip, true);
+        rosSetStatus('Connected â€” ' + ip, true);
         setupTopics();
         initAMRMap();
         initPIDCharts();
         buildPresets();
-        if (emergencyStopActive) {
-          publishEmergencyStopBurst();
-        }
       }
     });
     newRos.on('error', () => {
@@ -2594,7 +960,7 @@ function rosSetStatus(msg, online) {
   document.getElementById('ros-dot').className = 'ros-dot' + (online ? ' on' : '');
 }
 
-// ── Setup all ROS topics ──────────────────────────────────────
+// â”€â”€ Setup all ROS topics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function setupTopics() {
   // cmd_vel
@@ -2613,7 +979,7 @@ function setupTopics() {
   topicPID = new ROSLIB.Topic({ ros, name: '/pid_command', messageType: 'std_msgs/String' });
   topicPID.advertise();
 
-  // ── amcl_pose → robot position + history
+  // â”€â”€ amcl_pose â†’ robot position + history
   const poseTopic = new ROSLIB.Topic({ ros, name: '/amcl_pose', messageType: 'geometry_msgs/PoseWithCovarianceStamped' });
   poseTopic.subscribe(msg => {
     const nextX = msg.pose.pose.position.x;
@@ -2648,15 +1014,15 @@ function setupTopics() {
     }
   });
 
-  // ── IMU
+  // â”€â”€ IMU
   const imuTopic = new ROSLIB.Topic({ ros, name: '/imu/data', messageType: 'sensor_msgs/msg/Imu' });
   imuTopic.subscribe(msg => {
     const yaw = 2 * Math.atan2(msg.orientation.z, msg.orientation.w);
-    document.getElementById('imu-yaw-deg').textContent = (yaw * 180 / Math.PI).toFixed(2) + '°';
+    document.getElementById('imu-yaw-deg').textContent = (yaw * 180 / Math.PI).toFixed(2) + 'Â°';
     document.getElementById('imu-yaw-rad').textContent = yaw.toFixed(3);
   });
 
-  // ── /map — occupancy grid
+  // â”€â”€ /map â€” occupancy grid
   // Only render after the user explicitly starts SLAM or loads a saved map.
   mapLoadExpected = false;
 
@@ -2676,7 +1042,7 @@ function setupTopics() {
       } else if (!mapSwitchMapFrameTimer) {
         // Fallback: /map arrived but NAV status can lag or be missed over rosbridge.
         // Avoid false timeout while still giving status stream a short window to confirm.
-        setMapListMeta('Map frame received, waiting NAV status…');
+        setMapListMeta('Map frame received, waiting NAV statusâ€¦');
         mapSwitchMapFrameTimer = setTimeout(() => {
           mapSwitchMapFrameTimer = null;
           if (!mapSwitchInProgress || !mapSwitchHasMapFrame || mapSwitchNavConfirmed) return;
@@ -2689,7 +1055,7 @@ function setupTopics() {
     }
   });
 
-  // ── /scan — LiDAR
+  // â”€â”€ /scan â€” LiDAR
   const scanTopic = new ROSLIB.Topic({ ros, name: '/scan', messageType: 'sensor_msgs/msg/LaserScan' });
   let lastScanTime = 0;
   scanTopic.subscribe(msg => {
@@ -2713,36 +1079,30 @@ function setupTopics() {
     if (lidarVisible) redrawMap();
   });
 
-  // ── /plan — global path
+  // â”€â”€ /plan â€” global path
   const planTopic = new ROSLIB.Topic({ ros, name: '/plan', messageType: 'nav_msgs/msg/Path' });
   planTopic.subscribe(msg => {
     globalPath = msg.poses.map(p => ({ x: p.pose.position.x, y: p.pose.position.y }));
     if (pathVisible) redrawMap();
   });
 
-  // ── navigation status
+  // â”€â”€ navigation status
   const navStatus = new ROSLIB.Topic({ ros, name: '/navigate_to_pose/_action/status', messageType: 'action_msgs/msg/GoalStatusArray' });
   navStatus.subscribe(msg => {
     if (!msg.status_list || !msg.status_list.length) return;
     const s = msg.status_list[msg.status_list.length - 1].status;
     if (s === 4) {   // SUCCEEDED
-      if (missionActive) {
-        if (!missionGoalPending) return; // ignore repeated SUCCEEDED for the same goal
-        missionGoalPending = false;
-        advanceMission();
-      } else {
-        setNavState('SUCCESS');
-      }
+      if (missionActive) advanceMission();
+      else setNavState('SUCCESS');
       globalPath = [];
     } else if (s === 6) {  // ABORTED
-      missionGoalPending = false;
       missionActive = false;
       setNavState('FAILED');
       globalPath = [];
     }
   });
 
-  // ── /odom for PID chart actual wheel speeds
+  // â”€â”€ /odom for PID chart actual wheel speeds
   const odomTopic = new ROSLIB.Topic({ ros, name: '/odom', messageType: 'nav_msgs/msg/Odometry' });
   odomTopic.subscribe(msg => {
     const v = msg.twist.twist.linear.x;
@@ -2751,7 +1111,7 @@ function setupTopics() {
     pidActR = v + (w * WHEEL_BASE / 2);
   });
 
-  // ── SLAM control topics
+  // â”€â”€ SLAM control topics
   topicSlamCmd = new ROSLIB.Topic({ ros, name: '/slam/command', messageType: 'std_msgs/String' });
   topicSlamCmd.advertise();   // pre-advertise so rosbridge creates the publisher immediately (DDS discovery)
   topicSlamStatus = new ROSLIB.Topic({ ros, name: '/slam/status', messageType: 'std_msgs/String' });
@@ -2765,7 +1125,7 @@ function setupTopics() {
     messageType: 'std_msgs/String',
   });
   topicSlamMapList.subscribe(msg => {
-    console.log('[SLAM] 🔔 map_list RECEIVED:', msg);
+    console.log('[SLAM] ðŸ”” map_list RECEIVED:', msg);
     console.log('[SLAM]   msg.data:', msg?.data);
     console.log('[SLAM]   typeof msg.data:', typeof msg?.data);
     console.log('[SLAM]   msg keys:', Object.keys(msg || {}));
@@ -2790,12 +1150,12 @@ function setupTopics() {
 
 function requestSlamMapList() {
   if (!rosConnected || !topicSlamCmd) return;
-  console.log('[SLAM] 📢 Requesting map list via /slam/command');
-  setMapListMeta('Requesting saved maps…');
+  console.log('[SLAM] ðŸ“¢ Requesting map list via /slam/command');
+  setMapListMeta('Requesting saved mapsâ€¦');
   topicSlamCmd.publish(new ROSLIB.Message({ data: 'list_map' }));
 }
 
-// ── Map initialisation ────────────────────────────────────────
+// â”€â”€ Map initialisation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function initAMRMap() {
   const wrap = document.getElementById('amr-map-wrap');
@@ -2842,7 +1202,7 @@ function fitMapToCanvas() {
   mapPanOffset.y = (ch  - mapHeight * mapResolution * mapScale) / 2;
 }
 
-// ── Coordinate conversion ─────────────────────────────────────
+// â”€â”€ Coordinate conversion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function worldToCanvas(wx, wy) {
   const cx = (wx - mapOriginX) * mapScale + mapPanOffset.x;
@@ -2856,7 +1216,7 @@ function canvasToWorld(cx, cy) {
   return { x: wx, y: wy };
 }
 
-// ── Map drawing ───────────────────────────────────────────────
+// â”€â”€ Map drawing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 let rafPending = false;
 function redrawMap() {
@@ -3164,7 +1524,7 @@ function drawInitialPoseMarker() {
   ctx.fill();
 }
 
-// ── Map mouse / touch handlers ─────────────────────────────────
+// â”€â”€ Map mouse / touch handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function getCanvasPos(e) {
   const rect = mapCanvas.getBoundingClientRect();
@@ -3223,7 +1583,7 @@ function onMapMouseMove(e) {
   const cp = getCanvasPos(e);
   const wp = canvasToWorld(cp.x, cp.y);
   document.getElementById('map-coord-cur').textContent =
-    `Map X: ${wp.x.toFixed(3)} · Y: ${wp.y.toFixed(3)}`;
+    `Map X: ${wp.x.toFixed(3)} Â· Y: ${wp.y.toFixed(3)}`;
 
   if (isPanning) {
     mapPanOffset.x = e.clientX - panStart.x;
@@ -3282,7 +1642,7 @@ function onMapTouchStart(e) { e.preventDefault(); onMapMouseDown(e); }
 function onMapTouchMove(e)  { e.preventDefault(); onMapMouseMove(e); }
 function onMapTouchEnd(e)   { onMapMouseUp(e); }
 
-// ── Map utilities ─────────────────────────────────────────────
+// â”€â”€ Map utilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function mapZoom(factor, about) {
   const cx = about ? about.x : mapCanvas.width  / 2;
@@ -3318,7 +1678,7 @@ function toggleLayer(layer, on) {
   redrawMap();
 }
 
-// ── SLAM Control ──────────────────────────────────────────────
+// â”€â”€ SLAM Control â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function applyMapMsg(msg) {
   if (!mapLoadExpected) { console.log('[MAP] Ignored (no load requested yet)'); return; }
@@ -3360,7 +1720,7 @@ function listMaps() {
     toast('Not connected to ROS', 'err');
     return;
   }
-  console.log('[SLAM] listMaps() — requesting via ROS topic');
+  console.log('[SLAM] listMaps() â€” requesting via ROS topic');
   requestSlamMapList();
 }
 
@@ -3399,43 +1759,33 @@ function loadMap() {
 
   const overlay = document.getElementById('map-overlay-msg');
   if (overlay) overlay.style.display = 'flex';
-  setMapListMeta('Loading map "' + mapname + '"…');
+  setMapListMeta('Loading map "' + mapname + '"â€¦');
 
   topicSlamCmd.publish(new ROSLIB.Message({ data: 'load_map:' + mapname }));
-  toast('Loading map "' + mapname + '"…');
+  toast('Loading map "' + mapname + '"â€¦');
 
   // Wait for /map topic to deliver the newly loaded map.
-  if (mapSwitchWarningTimer) clearTimeout(mapSwitchWarningTimer);
   if (mapSwitchTimeoutTimer) clearTimeout(mapSwitchTimeoutTimer);
   const token = mapLoadRequestToken;
-  mapSwitchWarningTimer = setTimeout(() => {
-    if (!mapSwitchInProgress || token !== mapLoadRequestToken) return;
-    setMapListMeta('Still waiting for /map… Nav may be delayed, continuing to wait.', true);
-  }, MAP_SWITCH_WARNING_MS);
-
   mapSwitchTimeoutTimer = setTimeout(() => {
     if (!mapSwitchInProgress || token !== mapLoadRequestToken) return;
     mapSwitchInProgress = false;
     mapSwitchNavConfirmed = false;
     mapSwitchHasMapFrame = false;
-    if (mapSwitchWarningTimer) {
-      clearTimeout(mapSwitchWarningTimer);
-      mapSwitchWarningTimer = null;
-    }
     if (mapSwitchMapFrameTimer) {
       clearTimeout(mapSwitchMapFrameTimer);
       mapSwitchMapFrameTimer = null;
     }
     setMapListMeta('Timed out waiting for /map after loading "' + mapname + '"', true);
     toast('Map switch timed out. Check Nav2/map_server status.', 'err');
-  }, MAP_SWITCH_HARD_TIMEOUT_MS);
+  }, 15000);
 }
 
 function stopNav() {
   if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
   console.log('[SLAM] Sending command: stop_nav (current state:', slamState, ')');
   topicSlamCmd.publish(new ROSLIB.Message({ data: 'stop_nav' }));
-  toast('Stopping navigation…');
+  toast('Stopping navigationâ€¦');
 }
 
 function startSlam() {
@@ -3444,7 +1794,7 @@ function startSlam() {
   mapLoadExpected = true;
   console.log('[SLAM] Sending command: start_slam');
   topicSlamCmd.publish(new ROSLIB.Message({ data: 'start_slam' }));
-  toast('Starting SLAM…');
+  toast('Starting SLAMâ€¦');
   // Start live map view after a short startup delay
   setTimeout(startSlamMapPolling, 3000);
 }
@@ -3454,7 +1804,7 @@ function stopSlam() {
   console.log('[SLAM] Sending command: stop_slam (current state:', slamState, ')');
   stopSlamMapPolling();
   topicSlamCmd.publish(new ROSLIB.Message({ data: 'stop_slam' }));
-  toast('Stopping SLAM…');
+  toast('Stopping SLAMâ€¦');
 }
 
 function saveMap() {
@@ -3464,7 +1814,7 @@ function saveMap() {
   if (!name) { toast('Enter a map name', 'err'); return; }
   console.log('[SLAM] Sending command: save_map:' + name, '(state:', slamState, ')');
   topicSlamCmd.publish(new ROSLIB.Message({ data: 'save_map:' + name }));
-  toast('Saving map "' + name + '"…');
+  toast('Saving map "' + name + '"â€¦');
 }
 
 function setMapListMeta(text, isError = false) {
@@ -3475,7 +1825,7 @@ function setMapListMeta(text, isError = false) {
 }
 
 function parseMapListPayload(payload) {
-  console.log('[SLAM] 🔍 parseMapListPayload() START - input:', payload);
+  console.log('[SLAM] ðŸ” parseMapListPayload() START - input:', payload);
   const queue = [payload];
   let depth = 0;
   while (queue.length) {
@@ -3488,7 +1838,7 @@ function parseMapListPayload(payload) {
       const result = v
         .map(x => String(x ?? '').trim())
         .filter(Boolean);
-      console.log('[SLAM] ✓ Found array result:', result);
+      console.log('[SLAM] âœ“ Found array result:', result);
       return result;
     }
 
@@ -3506,7 +1856,7 @@ function parseMapListPayload(payload) {
           .map(p => p.trim().replace(/^"|"$/g, '').replace(/^'|'$/g, ''))
           .filter(Boolean);
         if (parts.length) {
-          console.log('[SLAM] ✓ Found fallback result:', parts);
+          console.log('[SLAM] âœ“ Found fallback result:', parts);
           return parts;
         }
       }
@@ -3517,12 +1867,12 @@ function parseMapListPayload(payload) {
       console.log('[SLAM]   Object detected. Keys:', Object.keys(v));
       if (Array.isArray(v.maps)) {
         const result = v.maps.map(x => String(x ?? '').trim()).filter(Boolean);
-        console.log('[SLAM] ✓ Found v.maps result:', result);
+        console.log('[SLAM] âœ“ Found v.maps result:', result);
         return result;
       }
       if (Array.isArray(v.list)) {
         const result = v.list.map(x => String(x ?? '').trim()).filter(Boolean);
-        console.log('[SLAM] ✓ Found v.list result:', result);
+        console.log('[SLAM] âœ“ Found v.list result:', result);
         return result;
       }
       if ('data' in v) {
@@ -3539,33 +1889,33 @@ function parseMapListPayload(payload) {
       }
     }
   }
-  console.log('[SLAM] ✗ parseMapListPayload() - No valid format found, returning []');
+  console.log('[SLAM] âœ— parseMapListPayload() - No valid format found, returning []');
   return [];
 }
 
 function populateMapList(rawPayload, source = '') {
-  console.log('[SLAM] 📝 populateMapList() START - source:', source);
+  console.log('[SLAM] ðŸ“ populateMapList() START - source:', source);
   const maps = parseMapListPayload(rawPayload);
-  console.log('[SLAM] 📝 parseMapListPayload returned:', maps, 'count:', maps.length);
+  console.log('[SLAM] ðŸ“ parseMapListPayload returned:', maps, 'count:', maps.length);
   mapListLoaded = true;
   const sel = document.getElementById('slam-map-select');
   if (!sel) {
-    console.log('[SLAM] ✗ Select element #slam-map-select not found!');
+    console.log('[SLAM] âœ— Select element #slam-map-select not found!');
     return;
   }
   const prev = sel.value;
-  console.log('[SLAM] 📝 Previous selection:', prev);
+  console.log('[SLAM] ðŸ“ Previous selection:', prev);
   sel.innerHTML = maps.length
     ? maps.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('')
-    : '<option value="">— no saved maps —</option>';
-  console.log('[SLAM] 📝 Dropdown updated with', maps.length, 'options');
+    : '<option value="">â€” no saved maps â€”</option>';
+  console.log('[SLAM] ðŸ“ Dropdown updated with', maps.length, 'options');
   // Restore previous selection if still available
   if (prev && maps.includes(prev)) sel.value = prev;
   if (maps.length) {
-    console.log('[SLAM] ✓ SUCCESS - Found', maps.length, 'map(s):', maps);
+    console.log('[SLAM] âœ“ SUCCESS - Found', maps.length, 'map(s):', maps);
     setMapListMeta((source ? source + ': ' : '') + maps.length + ' map(s) found');
   } else {
-    console.log('[SLAM] ✗ No maps found');
+    console.log('[SLAM] âœ— No maps found');
     setMapListMeta((source ? source + ': ' : '') + 'No saved maps received yet');
   }
 }
@@ -3604,10 +1954,10 @@ function updateSlamUI(state) {
       }
     } else {
       if (nameMatches) {
-        setMapListMeta('Nav started for "' + mapSwitchTargetName + '", waiting for /map…');
+        setMapListMeta('Nav started for "' + mapSwitchTargetName + '", waiting for /mapâ€¦');
       } else {
         setMapListMeta(
-          'Nav started with "' + (navMapRaw || '?') + '"; waiting for /map…',
+          'Nav started with "' + (navMapRaw || '?') + '"; waiting for /mapâ€¦',
           true
         );
       }
@@ -3620,10 +1970,6 @@ function updateSlamUI(state) {
     if (mapSwitchMapFrameTimer) {
       clearTimeout(mapSwitchMapFrameTimer);
       mapSwitchMapFrameTimer = null;
-    }
-    if (mapSwitchWarningTimer) {
-      clearTimeout(mapSwitchWarningTimer);
-      mapSwitchWarningTimer = null;
     }
     if (mapSwitchTimeoutTimer) {
       clearTimeout(mapSwitchTimeoutTimer);
@@ -3658,16 +2004,16 @@ function updateSlamUI(state) {
   if (navMode) navMode.disabled = isMapping;
 
   // Status text
-  if (isNav)                            statusT.textContent = '🗺️ Navigating with map: ' + state.substring(4);
-  else if (isLoading)                   statusT.textContent = '⏳ Loading map: ' + state.substring(8) + '…';
-  else if (state.startsWith('SAVED:'))  statusT.textContent = '✓ Map saved: ' + state.substring(6);
-  else if (state.startsWith('ERROR:'))  statusT.textContent = '✗ ' + state.substring(6);
-  else if (isMapping)                   statusT.textContent = 'SLAM active — drive the robot to build the map';
-  else if (isSaving)                    statusT.textContent = 'Saving map…';
+  if (isNav)                            statusT.textContent = 'ðŸ—ºï¸ Navigating with map: ' + state.substring(4);
+  else if (isLoading)                   statusT.textContent = 'â³ Loading map: ' + state.substring(8) + 'â€¦';
+  else if (state.startsWith('SAVED:'))  statusT.textContent = 'âœ“ Map saved: ' + state.substring(6);
+  else if (state.startsWith('ERROR:'))  statusT.textContent = 'âœ— ' + state.substring(6);
+  else if (isMapping)                   statusT.textContent = 'SLAM active â€” drive the robot to build the map';
+  else if (isSaving)                    statusT.textContent = 'Saving mapâ€¦';
   else                                  statusT.textContent = '';
 }
 
-// ── Navigation ────────────────────────────────────────────────
+// â”€â”€ Navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function sendNavGoal(x, y, yaw) {
   if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
@@ -3705,7 +2051,7 @@ function setNavState(state) {
 function updateNavStatus() {
   if (robotX !== null && robotY !== null) {
     document.getElementById('map-coord-robot').textContent =
-      `Robot: ${robotX.toFixed(3)} · ${robotY.toFixed(3)}  ·  Yaw: ${(robotYaw*180/Math.PI).toFixed(1)}°`;
+      `Robot: ${robotX.toFixed(3)} Â· ${robotY.toFixed(3)}  Â·  Yaw: ${(robotYaw*180/Math.PI).toFixed(1)}Â°`;
   }
   if (goalX !== null && robotX !== null) {
     const dist = Math.sqrt((goalX-robotX)**2 + (goalY-robotY)**2);
@@ -3753,7 +2099,7 @@ function publishInitialPose(x, y, yaw) {
     }
   }, 12000);
 
-  toast('Initial pose sent. Waiting for AMCL localization…', 'ok');
+  toast('Initial pose sent. Waiting for AMCL localizationâ€¦', 'ok');
 }
 
 function setInitialPose() {
@@ -3769,64 +2115,28 @@ function setInitialPose() {
   toast('Click-drag on the map to set the initial pose like RViz', 'ok');
 }
 
-function publishEmergencyStopBurst() {
-  if (!rosConnected || !topicCmdVel) return;
-  const zero = new ROSLIB.Message({ linear:{x:0,y:0,z:0}, angular:{x:0,y:0,z:0} });
-  updatePidTargetsFromCmd(0, 0);
-  topicCmdVel.publish(zero);
-}
-
-function engageEmergencyStopLatch(durationMs = 5000) {
-  emergencyStopActive = true;
-  if (emergencyStopTimer) {
-    clearTimeout(emergencyStopTimer);
-    emergencyStopTimer = null;
-  }
-  emergencyStopTimer = setTimeout(() => {
-    emergencyStopActive = false;
-    emergencyStopTimer = null;
-    const missionStartBtn = document.getElementById('mission-start-btn');
-    const missionStopBtn = document.getElementById('mission-stop-btn');
-    if (missionStartBtn && !missionActive) missionStartBtn.disabled = false;
-    if (missionStopBtn) missionStopBtn.disabled = true;
-  }, durationMs);
-}
-
-// ── Emergency stop ────────────────────────────────────────────
+// â”€â”€ Emergency stop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function emergencyStop() {
   if (teleopInterval) { clearInterval(teleopInterval); teleopInterval = null; }
   missionActive = false;
   missionIndex  = 0;
-  missionGoalPending = false;
-  engageEmergencyStopLatch(5000);
   setNavState('IDLE');
   goalX = null; goalY = null;
-  goalInitX = null; goalInitY = null;
   globalPath = [];
 
-  const missionStartBtn = document.getElementById('mission-start-btn');
-  const missionStopBtn = document.getElementById('mission-stop-btn');
-  if (missionStartBtn) missionStartBtn.disabled = true;
-  if (missionStopBtn) missionStopBtn.disabled = true;
-
   if (rosConnected) {
-    publishEmergencyStopBurst();
-    const burstCount = 40;
-    for (let i = 1; i <= burstCount; i++) {
-      setTimeout(() => {
-        if (emergencyStopActive) publishEmergencyStopBurst();
-      }, i * 100);
-    }
+    const zero = new ROSLIB.Message({ linear:{x:0,y:0,z:0}, angular:{x:0,y:0,z:0} });
+    updatePidTargetsFromCmd(0, 0);
+    for (let i = 0; i < 5; i++) setTimeout(() => topicCmdVel.publish(zero), i * 50);
   }
-  toast('⛔ EMERGENCY STOP — motion clamped', 'err');
+  toast('â›” EMERGENCY STOP â€” Robot halted', 'err');
   redrawMap();
 }
 
-// ── Teleop ────────────────────────────────────────────────────
+// â”€â”€ Teleop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function teleopStart(linDir, angDir) {
-  if (emergencyStopActive) { toast('Emergency stop is active', 'err'); return; }
   if (amrMode !== 'manual') { toast('Switch to Manual Mode', 'err'); return; }
   if (!rosConnected) return;
   const lin = parseFloat(document.getElementById('sl-linear').value);
@@ -3846,7 +2156,8 @@ function teleopStart(linDir, angDir) {
 function teleopStop() {
   clearInterval(teleopInterval); teleopInterval = null;
   if (rosConnected) {
-    publishEmergencyStopBurst();
+    updatePidTargetsFromCmd(0, 0);
+    topicCmdVel.publish(new ROSLIB.Message({ linear:{x:0,y:0,z:0}, angular:{x:0,y:0,z:0} }));
   }
 }
 
@@ -3860,7 +2171,7 @@ function updateSpeedLabel() {
   document.getElementById('lbl-angular').textContent = parseFloat(document.getElementById('sl-angular').value).toFixed(2);
 }
 
-// ── Mode switching ────────────────────────────────────────────
+// â”€â”€ Mode switching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function setMode(mode) {
   amrMode = mode;
@@ -3874,10 +2185,10 @@ function setMode(mode) {
   tBtns.forEach(b => { b.disabled = (mode === 'auto'); });
 
   if (mode === 'manual') teleopStop();
-  toast(mode === 'manual' ? '🎮 Manual Mode active' : '🤖 Auto Navigation active', 'ok');
+  toast(mode === 'manual' ? 'ðŸŽ® Manual Mode active' : 'ðŸ¤– Auto Navigation active', 'ok');
 }
 
-// ── Mission planner ───────────────────────────────────────────
+// â”€â”€ Mission planner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function addMissionWaypoint(x, y, yaw = 0) {
   missionWaypoints.push({ x, y, yaw });
@@ -3888,7 +2199,6 @@ function clearWaypoints() {
   missionWaypoints = [];
   missionActive = false;
   missionIndex  = 0;
-  missionGoalPending = false;
   renderWaypointList();
   redrawMap();
   setNavState('IDLE');
@@ -3898,7 +2208,7 @@ function renderWaypointList() {
   const list = document.getElementById('wp-list');
   document.getElementById('wp-count-lbl').textContent = missionWaypoints.length + ' point' + (missionWaypoints.length !== 1 ? 's' : '');
   if (!missionWaypoints.length) {
-    list.innerHTML = `<div style="text-align:center;padding:16px;color:var(--muted);font-family:var(--mono);font-size:10px">Switch to 📌 Add Waypoint mode then click the map</div>`;
+    list.innerHTML = `<div style="text-align:center;padding:16px;color:var(--muted);font-family:var(--mono);font-size:10px">Switch to ðŸ“Œ Add Waypoint mode then click the map</div>`;
     return;
   }
   list.innerHTML = missionWaypoints.map((wp, i) => {
@@ -3906,8 +2216,8 @@ function renderWaypointList() {
     const active = missionActive && i === missionIndex;
     return `<div class="wp-item${active?' active-wp':''}${done?' done-wp':''}">
       <div class="wp-num">${i+1}</div>
-      <div class="wp-coords">X ${wp.x.toFixed(2)} · Y ${wp.y.toFixed(2)}</div>
-      <button class="wp-del" onclick="removeMissionWaypoint(${i})" title="Remove">✕</button>
+      <div class="wp-coords">X ${wp.x.toFixed(2)} Â· Y ${wp.y.toFixed(2)}</div>
+      <button class="wp-del" onclick="removeMissionWaypoint(${i})" title="Remove">âœ•</button>
     </div>`;
   }).join('');
 }
@@ -3920,12 +2230,10 @@ function removeMissionWaypoint(i) {
 
 function startMission() {
   if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
-  if (emergencyStopActive) { toast('Clear emergency stop before starting a mission', 'err'); return; }
   if (!missionWaypoints.length) { toast('No waypoints defined', 'err'); return; }
   if (amrMode !== 'auto') { setMode('auto'); }
   missionActive = true;
   missionIndex  = 0;
-  missionGoalPending = false;
   document.getElementById('mission-start-btn').disabled = true;
   document.getElementById('mission-stop-btn').disabled  = false;
   renderWaypointList();
@@ -3934,49 +2242,20 @@ function startMission() {
 
 function stopMission() {
   missionActive = false;
-  missionGoalPending = false;
   emergencyStop();
-  document.getElementById('mission-start-btn').disabled = emergencyStopActive;
+  document.getElementById('mission-start-btn').disabled = false;
   document.getElementById('mission-stop-btn').disabled  = true;
   renderWaypointList();
 }
 
 function navigateToCurrentMissionPoint() {
-  if (emergencyStopActive) return;
   if (!missionActive || missionIndex >= missionWaypoints.length) return;
   const wp = missionWaypoints[missionIndex];
   sendNavGoal(wp.x, wp.y, wp.yaw || 0);
-  missionGoalPending = true;
   renderWaypointList();
 }
 
-async function markPickTaskFromMission(wp) {
-  const ptId = Number(wp?.pickTaskId ?? 0);
-  if (!ptId) return;
-
-  try {
-    await api('/pick/' + ptId + '/arrived', { method: 'POST' });
-  } catch (e) {
-    console.warn('[MISSION] pick_arrived failed:', ptId, e?.message || e);
-  }
-
-  try {
-    const res = await api('/pick/' + ptId + '/complete', { method: 'POST' });
-    if (res?.status === 'picked') {
-      toast('✅ Pick task #' + ptId + ' completed', 'ok');
-    }
-  } catch (e) {
-    // Expected when one condition is still missing (e.g. waiting for QR scan).
-    const msg = String(e?.message || '');
-    if (msg.includes('not yet scanned') || msg.includes('not yet arrived')) return;
-    console.warn('[MISSION] pick_complete failed:', ptId, msg);
-  }
-}
-
 function advanceMission() {
-  const currentWp = missionWaypoints[missionIndex];
-  markPickTaskFromMission(currentWp);
-
   missionIndex++;
   if (missionIndex < missionWaypoints.length) {
     setTimeout(() => {
@@ -3988,7 +2267,7 @@ function advanceMission() {
     document.getElementById('mission-start-btn').disabled = false;
     document.getElementById('mission-stop-btn').disabled  = true;
     renderWaypointList();
-    toast('✅ Mission complete — all waypoints reached', 'ok');
+    toast('âœ… Mission complete â€” all waypoints reached', 'ok');
   }
 }
 
@@ -4011,15 +2290,15 @@ function updateDynamicWaypointsList() {
   const draftHtml = draftWaypoints.map((wp, i) => `
     <div class="wp-item" style="border-left:3px solid #3498db">
       <div class="wp-num" style="background:#3498db">D${i + 1}</div>
-      <div class="wp-coords">Draft · X ${wp.x.toFixed(2)} · Y ${wp.y.toFixed(2)}</div>
-      <button class="wp-del" onclick="draftWaypoints.splice(${i},1);updateDynamicWaypointsList();redrawMap()" title="Remove draft">✕</button>
+      <div class="wp-coords">Draft Â· X ${wp.x.toFixed(2)} Â· Y ${wp.y.toFixed(2)}</div>
+      <button class="wp-del" onclick="draftWaypoints.splice(${i},1);updateDynamicWaypointsList();redrawMap()" title="Remove draft">âœ•</button>
     </div>
   `).join('');
 
   const savedHtml = squareWaypoints.map((wp, i) => `
     <div class="wp-item" style="border-left:3px solid #8e44ad">
       <div class="wp-num" style="background:#8e44ad">S${i + 1}</div>
-      <div class="wp-coords">${esc(wp.name || 'Shelf')} · X ${wp.x.toFixed(2)} · Y ${wp.y.toFixed(2)}</div>
+      <div class="wp-coords">${esc(wp.name || 'Shelf')} Â· X ${wp.x.toFixed(2)} Â· Y ${wp.y.toFixed(2)}</div>
       <div style="margin-left:auto;font-size:10px;color:var(--muted)">DB</div>
     </div>
   `).join('');
@@ -4047,7 +2326,7 @@ function toggleMultiWaypointMode() {
   isMultiWpMode = !isMultiWpMode;
   const btn = document.getElementById('btn-multi-wp');
   if (btn) {
-    btn.textContent = isMultiWpMode ? '📍 Point Mode: ON (Click map)' : '📍 1. Enable Point Mode';
+    btn.textContent = isMultiWpMode ? 'ðŸ“ Point Mode: ON (Click map)' : 'ðŸ“ 1. Enable Point Mode';
     btn.classList.toggle('amr-btn-green', isMultiWpMode);
     btn.classList.toggle('amr-btn-ghost', !isMultiWpMode);
   }
@@ -4124,7 +2403,7 @@ async function clearAllSavedWaypoints() {
   }
 }
 
-// ── Preset nav buttons ────────────────────────────────────────
+// â”€â”€ Preset nav buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function buildPresets() {
   const list = document.getElementById('preset-list');
@@ -4140,7 +2419,7 @@ function buildPresets() {
     </div>`).join('');
 }
 
-// ── IMU display ───────────────────────────────────────────────
+// â”€â”€ IMU display â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function updateIMUDisplay() {
   if (robotX !== null) {
@@ -4149,15 +2428,14 @@ function updateIMUDisplay() {
   }
 }
 
-// ── PID ───────────────────────────────────────────────────────
+// â”€â”€ PID â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function sendPID() {
   if (!rosConnected) { toast('Not connected to ROS', 'err'); return; }
   const kp = document.getElementById('pid-kp').value;
   const ki = document.getElementById('pid-ki').value;
-  const kd = document.getElementById('pid-kd').value;
-  topicPID.publish(new ROSLIB.Message({ data: `PID,${parseFloat(kp).toFixed(2)},${parseFloat(ki).toFixed(2)},${parseFloat(kd).toFixed(2)}\n` }));
-  toast(`PID uploaded — Kp=${kp} Ki=${ki} Kd=${kd}`, 'ok');
+  topicPID.publish(new ROSLIB.Message({ data: `PID,${parseFloat(kp).toFixed(2)},${parseFloat(ki).toFixed(2)}\n` }));
+  toast(`PID uploaded â€” Kp=${kp} Ki=${ki}`, 'ok');
 }
 
 function pidTestRun() {
@@ -4207,9 +2485,9 @@ function initPIDCharts() {
   }, 100);
 }
 
-/* ════════════════════════════════════════════════════════════
-   ORDERS — CRUD & PICK WORKFLOW
-════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   ORDERS â€” CRUD & PICK WORKFLOW
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 let _orders = [];
 let _openOrderId = null;   // track which order detail panel is open
 
@@ -4239,15 +2517,15 @@ function renderOrders(data) {
     return `<tr data-order-id="${r.id}" data-status="${r.status}">
       <td class="id">${esc(r.id)}</td>
       <td class="code" style="cursor:pointer;color:var(--blue)" onclick="viewOrder(${r.id})">${esc(r.order_code)}</td>
-      <td>${esc(r.assigned_robot ?? '—')}</td>
+      <td>${esc(r.assigned_robot ?? 'â€”')}</td>
       <td><span class="order-status ${r.status}">${r.status}</span></td>
       <td>${r.picked_count}/${r.item_count}</td>
       <td><div class="order-progress"><div class="order-progress-fill" style="width:${pct}%"></div></div>${pct}%</td>
-      <td class="time">${esc(r.created_at ?? '—')}</td>
+      <td class="time">${esc(r.created_at ?? 'â€”')}</td>
       <td class="acts">
-        ${r.status === 'PENDING' ? `<button class="btn btn-primary btn-sm" onclick="dispatchOrder(${r.id})">▶ Dispatch</button>` : ''}
+        ${r.status === 'PENDING' ? `<button class="btn btn-primary btn-sm" onclick="dispatchOrder(${r.id})">â–¶ Dispatch</button>` : ''}
         ${['PENDING','COMPLETED','CANCELLED'].includes(r.status) ? `<button class="btn btn-danger btn-sm" onclick="deleteOrder(${r.id},'${esc(r.order_code)}')">Del</button>` : ''}
-        ${r.status === 'IN_PROGRESS' ? `<button class="btn btn-ghost btn-sm" onclick="loadOrderToMission(${r.id})">📍 Load to AMR</button>` : ''}
+        ${r.status === 'IN_PROGRESS' ? `<button class="btn btn-ghost btn-sm" onclick="loadOrderToMission(${r.id})">ðŸ“ Load to AMR</button>` : ''}
         ${r.status === 'IN_PROGRESS' ? `<button class="btn btn-danger btn-sm" onclick="cancelOrder(${r.id},'${esc(r.order_code)}')">Cancel</button>` : ''}
       </td></tr>`;
   }).join('');
@@ -4264,7 +2542,7 @@ function renderOrders(data) {
   });
 }
 
-async function viewOrder(oid, silent = false) {
+async function viewOrder(oid, silent = false, silent = false) {
   try {
     _openOrderId = oid;
     const d = await api('/orders/' + oid);
@@ -4288,7 +2566,7 @@ async function viewOrder(oid, silent = false) {
       html += `<div class="pick-task-row">
         <div class="pick-task-seq ${pt.status}">${pt.seq}</div>
         <div class="pick-task-info">
-          <div><strong>${esc(pt.location_code ?? '?')}</strong> — ${esc(pt.product_name ?? '')} ×${pt.quantity}</div>
+          <div><strong>${esc(pt.location_code ?? '?')}</strong> â€” ${esc(pt.product_name ?? '')} Ã—${pt.quantity}</div>
           <div style="color:var(--muted);font-family:var(--mono);font-size:10px">
             x=${pt.nav_x?.toFixed(3)} y=${pt.nav_y?.toFixed(3)} yaw=${pt.nav_yaw?.toFixed(3)}
           </div>
@@ -4308,12 +2586,12 @@ function closeOrderDetail() {
   _openOrderId = null;
 }
 
-/* ── Create Order Modal ────────────────────────────────────── */
+/* â”€â”€ Create Order Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function openCreateOrder() {
   modalCtx = { table: '_order', mode: 'add' };
   document.getElementById('modal-title').textContent = 'Create Pick Order';
-  const pOpts = _products.map(p => `<option value="${p.id}">${esc(p.product_code)} — ${esc(p.name ?? '')}</option>`).join('');
-  const rOpts = _robots.filter(r => r.status === 'IDLE' || r.status === 'CHARGING').map(r => `<option value="${esc(r.robot_code)}">${esc(r.robot_code)} — ${esc(r.description ?? '')}</option>`).join('');
+  const pOpts = _products.map(p => `<option value="${p.id}">${esc(p.product_code)} â€” ${esc(p.name ?? '')}</option>`).join('');
+  const rOpts = _robots.filter(r => r.status === 'IDLE' || r.status === 'CHARGING').map(r => `<option value="${esc(r.robot_code)}">${esc(r.robot_code)} â€” ${esc(r.description ?? '')}</option>`).join('');
   document.getElementById('modal-body').innerHTML = `
     <div class="form-grid one">
       <div class="field"><label>Order Code *</label><input id="f-oc" placeholder="ORD-001"/></div>
@@ -4333,15 +2611,15 @@ function openCreateOrder() {
 let _ocItemCounter = 0;
 function addOrderItemRow() {
   _ocItemCounter++;
-  const pOpts = _products.map(p => `<option value="${p.id}">${esc(p.product_code)} — ${esc(p.name ?? '')}</option>`).join('');
+  const pOpts = _products.map(p => `<option value="${p.id}">${esc(p.product_code)} â€” ${esc(p.name ?? '')}</option>`).join('');
   const container = document.getElementById('order-create-items');
   const row = document.createElement('div');
   row.className = 'oc-item-row';
   row.id = 'oc-row-' + _ocItemCounter;
   row.innerHTML = `
-    <select class="oc-prod"><option value="">— product —</option>${pOpts}</select>
+    <select class="oc-prod"><option value="">â€” product â€”</option>${pOpts}</select>
     <input type="number" class="oc-qty" min="1" value="1" placeholder="Qty"/>
-    <button onclick="this.parentElement.remove()">✕</button>
+    <button onclick="this.parentElement.remove()">âœ•</button>
   `;
   container.appendChild(row);
 }
@@ -4372,11 +2650,11 @@ async function submitCreateOrder() {
   } catch(e) { toast(e.message, 'err'); }
 }
 
-/* ── Dispatch & Delete ─────────────────────────────────────── */
+/* â”€â”€ Dispatch & Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 async function dispatchOrder(oid) {
   try {
     const d = await api('/orders/' + oid + '/dispatch', { method: 'POST' });
-    toast('Order dispatched — ' + (d.pick_tasks?.length ?? 0) + ' pick stops');
+    toast('Order dispatched â€” ' + (d.pick_tasks?.length ?? 0) + ' pick stops');
     loadOrders();
   } catch(e) { toast(e.message, 'err'); }
 }
@@ -4391,7 +2669,7 @@ async function deleteOrder(oid, label) {
   } catch(e) { toast(e.message, 'err'); }
 }
 
-/* ── Load order pick tasks into AMR Mission Planner ────────── */
+/* â”€â”€ Load order pick tasks into AMR Mission Planner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 async function loadOrderToMission(oid) {
   try {
     const d = await api('/orders/' + oid);
@@ -4405,13 +2683,9 @@ async function loadOrderToMission(oid) {
     setNavState('IDLE');
     // Add each pick task as a waypoint for the mission planner only.
     d.pick_tasks.forEach(pt => {
-      if (pt.status === 'PICKED' || pt.status === 'CANCELLED') return; // skip finished tasks
+      if (pt.status === 'PICKED') return; // skip already picked
       missionWaypoints.push({
-        x: pt.nav_x,
-        y: pt.nav_y,
-        yaw: pt.nav_yaw,
-        pickTaskId: pt.id,
-        orderId: d.id,
+        x: pt.nav_x, y: pt.nav_y, yaw: pt.nav_yaw,
         label: pt.location_code ?? ('Stop ' + pt.seq),
       });
     });
@@ -4435,9 +2709,9 @@ async function cancelOrder(oid, code) {
   } catch(e) { toast(e.message, 'err'); }
 }
 
-/* ════════════════════════════════════════════════════════════
-   SIMULATION TAB — Three.js + URDF
-════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   SIMULATION TAB â€” Three.js + URDF
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 let simScene, simCamera, simRenderer, simControls, simClock;
 let simRobotGroup = null;       // current URDF robot mesh group
@@ -4461,7 +2735,7 @@ let simPathLine = null;         // THREE.Line for nav path
 let simWaypointMarkers = [];    // array of THREE.Mesh for mission waypoints
 let simLidarOn = true, simPathOn = true, simWaypointsOn = true;
 
-// Deferred loader — load Three.js + URDFLoader on first tab visit
+// Deferred loader â€” load Three.js + URDFLoader on first tab visit
 let simLibsLoaded = false;
 let simLibsLoading = false;
 
@@ -4483,7 +2757,7 @@ function ensureSimLibs(cb) {
   });
 }
 
-// ── Init 3D scene ─────────────────────────────────────────────
+// â”€â”€ Init 3D scene â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function simInit() {
   if (simInitialized) return;
   simInitialized = true;
@@ -4526,7 +2800,7 @@ function simInit() {
   simRaycaster = new THREE.Raycaster();
   simMouse = new THREE.Vector2();
 
-  // ── Lights ──
+  // â”€â”€ Lights â”€â”€
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
   simScene.add(ambientLight);
 
@@ -4545,7 +2819,7 @@ function simInit() {
   const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x362a28, 0.5);
   simScene.add(hemiLight);
 
-  // ── Ground plane (subtle) ──
+  // â”€â”€ Ground plane (subtle) â”€â”€
   const groundGeo = new THREE.PlaneGeometry(60, 60);
   const groundMat = new THREE.MeshStandardMaterial({ color: 0x151b26, roughness: 0.95 });
   const ground = new THREE.Mesh(groundGeo, groundMat);
@@ -4555,15 +2829,15 @@ function simInit() {
   ground.name = 'ground';
   simScene.add(ground);
 
-  // ── Grid ──
+  // â”€â”€ Grid â”€â”€
   simGridHelper = new THREE.GridHelper(20, 40, 0x1a2944, 0x111a2a);
   simScene.add(simGridHelper);
 
-  // ── Axes ──
+  // â”€â”€ Axes â”€â”€
   simAxesHelper = new THREE.AxesHelper(2);
   simScene.add(simAxesHelper);
 
-  // ── Goal marker (hidden initially) ──
+  // â”€â”€ Goal marker (hidden initially) â”€â”€
   const goalGeo = new THREE.CylinderGeometry(0.05, 0.15, 0.3, 8);
   const goalMat = new THREE.MeshStandardMaterial({ color: 0x00e0ff, emissive: 0x00e0ff, emissiveIntensity: 0.5 });
   simGoalMarker = new THREE.Mesh(goalGeo, goalMat);
@@ -4571,13 +2845,13 @@ function simInit() {
   simGoalMarker.position.y = 0.15;
   simScene.add(simGoalMarker);
 
-  // ── Events ──
+  // â”€â”€ Events â”€â”€
   window.addEventListener('resize', simResize);
   new ResizeObserver(simResize).observe(container);
   canvas.addEventListener('click', simOnClick);
   canvas.addEventListener('mousemove', simOnMouseMove);
 
-  // ── URDF drag-and-drop ──
+  // â”€â”€ URDF drag-and-drop â”€â”€
   const drop = document.getElementById('sim-urdf-drop');
   drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
   drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
@@ -4604,7 +2878,7 @@ function simResize() {
   simRenderer.setSize(w, h, false);
 }
 
-// ── Animation loop ────────────────────────────────────────────
+// â”€â”€ Animation loop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function simAnimate() {
   if (!simAnimating) { simAnimating = true; }
   requestAnimationFrame(simAnimate);
@@ -4633,7 +2907,7 @@ function simAnimate() {
     simRobotGroup.rotation.y = robotYaw || 0;
     document.getElementById('sim-pose-x').textContent = robotX.toFixed(3);
     document.getElementById('sim-pose-y').textContent = robotY.toFixed(3);
-    document.getElementById('sim-pose-yaw').textContent = ((robotYaw || 0) * 180 / Math.PI).toFixed(1) + '°';
+    document.getElementById('sim-pose-yaw').textContent = ((robotYaw || 0) * 180 / Math.PI).toFixed(1) + 'Â°';
   }
 
   // Pulse goal marker
@@ -4649,12 +2923,12 @@ function simAnimate() {
   simRenderer.render(simScene, simCamera);
 }
 
-// ── URDF Loading ──────────────────────────────────────────────
+// â”€â”€ URDF Loading â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function simLoadUrdfFile(file) {
   const reader = new FileReader();
   reader.onload = (e) => {
     const urdfText = e.target.result;
-    document.getElementById('sim-urdf-name').textContent = '✓ ' + file.name;
+    document.getElementById('sim-urdf-name').textContent = 'âœ“ ' + file.name;
     simParseAndLoadUrdf(urdfText, file.name);
   };
   reader.readAsText(file);
@@ -4666,7 +2940,7 @@ function simLoadUrdfFromUrl() {
   fetch(url)
     .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
     .then(text => {
-      document.getElementById('sim-urdf-name').textContent = '✓ Loaded from URL';
+      document.getElementById('sim-urdf-name').textContent = 'âœ“ Loaded from URL';
       simParseAndLoadUrdf(text, 'robot.urdf');
     })
     .catch(err => toast('Failed to load URDF: ' + err, 'err'));
@@ -4770,7 +3044,7 @@ function simParseAndLoadUrdf(urdfText, filename) {
   }
 }
 
-// ── Built-in TurtleBot3-style robot ───────────────────────────
+// â”€â”€ Built-in TurtleBot3-style robot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function simLoadDefaultRobot() {
   if (simRobotGroup) {
     simScene.remove(simRobotGroup);
@@ -4780,7 +3054,7 @@ function simLoadDefaultRobot() {
   simRobotGroup = new THREE.Group();
   simRobotGroup.name = 'TurtleBot3';
 
-  // Body — flat cylinder
+  // Body â€” flat cylinder
   const bodyGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.06, 24);
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6 });
   const body = new THREE.Mesh(bodyGeo, bodyMat);
@@ -4846,7 +3120,7 @@ function simLoadDefaultRobot() {
 
   simRobotGroup.position.y = SIM_ROBOT_HEIGHT;
   simScene.add(simRobotGroup);
-  document.getElementById('sim-urdf-name').textContent = '✓ TurtleBot3 (built-in)';
+  document.getElementById('sim-urdf-name').textContent = 'âœ“ TurtleBot3 (built-in)';
   toast('Loaded TurtleBot3 model');
 }
 
@@ -4869,7 +3143,7 @@ function simBuildPlaceholderRobot(group) {
   group.add(arrow);
 }
 
-// ── Scene toggles ─────────────────────────────────────────────
+// â”€â”€ Scene toggles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let simGridOn = true, simAxesOn = true, simMapOn = false;
 
 function simToggleGrid() {
@@ -4909,7 +3183,7 @@ function simFollowRobot() {
   document.getElementById('sim-mode-txt').textContent = simFollowing ? 'Follow' : 'Orbit';
 }
 
-// ── Occupancy map as 3D floor texture ─────────────────────────
+// â”€â”€ Occupancy map as 3D floor texture â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function simToggleMap() {
   simMapOn = !simMapOn;
   document.getElementById('sim-map-btn').textContent = 'Map: ' + (simMapOn ? 'ON' : 'OFF');
@@ -4925,7 +3199,7 @@ function simToggleMap() {
 function simBuildMap() {
   if (simMapMesh) { simScene.remove(simMapMesh); simMapMesh = null; }
   if (!occupancyData || !mapWidth || !mapHeight) {
-    toast('No map data — load a map in AMR tab first', 'err');
+    toast('No map data â€” load a map in AMR tab first', 'err');
     simMapOn = false;
     document.getElementById('sim-map-btn').textContent = 'Map: OFF';
     return;
@@ -4938,11 +3212,11 @@ function simBuildMap() {
     const v = occupancyData[i];
     let r, g, b, a;
     if (v === -1 || v === 255) {
-      r = 26; g = 37; b = 53; a = 180;   // unknown — dark blue-gray
+      r = 26; g = 37; b = 53; a = 180;   // unknown â€” dark blue-gray
     } else if (v > 50) {
-      r = 40; g = 40; b = 50; a = 255;   // occupied — dark
+      r = 40; g = 40; b = 50; a = 255;   // occupied â€” dark
     } else {
-      r = 200; g = 210; b = 220; a = 200; // free — light
+      r = 200; g = 210; b = 220; a = 200; // free â€” light
     }
     // Flip Y for Three.js texture
     const row = h - 1 - Math.floor(i / w);
@@ -4970,7 +3244,7 @@ function simBuildMap() {
   simScene.add(simMapMesh);
 }
 
-// ── 3D LiDAR point cloud ──────────────────────────────────────
+// â”€â”€ 3D LiDAR point cloud â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function simUpdateLidar() {
   // Remove previous
   if (simLidarPoints) { simScene.remove(simLidarPoints); simLidarPoints = null; }
@@ -4984,7 +3258,7 @@ function simUpdateLidar() {
     const p = lidarPoints[i];
     positions[i * 3]     = p.x;
     positions[i * 3 + 1] = 0.08;   // slightly above ground
-    positions[i * 3 + 2] = -p.y;   // ROS Y → Three.js -Z
+    positions[i * 3 + 2] = -p.y;   // ROS Y â†’ Three.js -Z
 
     // Color: close points warm, far points cool
     const dist = robotX !== null
@@ -5012,7 +3286,7 @@ function simUpdateLidar() {
   simScene.add(simLidarPoints);
 }
 
-// ── 3D navigation path ────────────────────────────────────────
+// â”€â”€ 3D navigation path â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function simUpdatePath() {
   if (simPathLine) { simScene.remove(simPathLine); simPathLine = null; }
   if (!globalPath || globalPath.length < 2) return;
@@ -5024,7 +3298,7 @@ function simUpdatePath() {
   simScene.add(simPathLine);
 }
 
-// ── 3D waypoint markers ───────────────────────────────────────
+// â”€â”€ 3D waypoint markers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function simUpdateWaypoints() {
   // Remove old markers
   simWaypointMarkers.forEach(m => simScene.remove(m));
@@ -5077,19 +3351,19 @@ function simToggleWaypoints() {
   if (!simWaypointsOn) { simWaypointMarkers.forEach(m => simScene.remove(m)); simWaypointMarkers = []; }
 }
 
-// ── Click-to-set-goal ─────────────────────────────────────────
+// â”€â”€ Click-to-set-goal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function simToggleGoalMode() {
   simGoalMode = !simGoalMode;
   const btn = document.getElementById('sim-goal-btn');
   const crosshair = document.getElementById('sim-crosshair');
   if (simGoalMode) {
-    btn.textContent = '✕ Cancel Goal Mode';
+    btn.textContent = 'âœ• Cancel Goal Mode';
     btn.className = 'sim-btn sim-btn-danger';
     crosshair.style.display = 'block';
     document.getElementById('sim-mode-txt').textContent = 'Set Goal';
     simRenderer.domElement.style.cursor = 'crosshair';
   } else {
-    btn.textContent = '🎯 Click to Set Goal';
+    btn.textContent = 'ðŸŽ¯ Click to Set Goal';
     btn.className = 'sim-btn sim-btn-green';
     crosshair.style.display = 'none';
     document.getElementById('sim-mode-txt').textContent = simFollowing ? 'Follow' : 'Orbit';
@@ -5112,7 +3386,7 @@ function simOnClick(e) {
 
   const pt = hits[0].point;
   const worldX = pt.x;
-  const worldY = -pt.z;   // Three.js Z → ROS Y
+  const worldY = -pt.z;   // Three.js Z â†’ ROS Y
 
   // Place goal marker
   simGoalMarker.position.set(pt.x, 0.15, pt.z);
@@ -5149,7 +3423,7 @@ function simOnMouseMove(e) {
   }
 }
 
-// ── Multi-robot fleet visualization ───────────────────────────
+// â”€â”€ Multi-robot fleet visualization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function simUpdateFleetList() {
   const list = document.getElementById('sim-robot-list');
   if (!_robots || !_robots.length) {
@@ -5167,7 +3441,7 @@ function simUpdateFleetList() {
   }).join('');
 }
 
-// ── Tab activation hook ───────────────────────────────────────
+// â”€â”€ Tab activation hook â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Initialize simulation on first tab visit
 const simTabBtn = document.querySelector('[data-tab="sim"]');
 if (simTabBtn) {
@@ -5181,12 +3455,10 @@ if (simTabBtn) {
   });
 }
 
-/* ════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    BOOT
-════════════════════════════════════════════════════════════ */
-connectWS();   // start WebSocket — handles live view
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+connectWS();   // start WebSocket â€” handles live view
 loadCrud();    // load all CRUD tables once
 loadOrders();  // load orders
-</script>
-</body>
-</html>
+

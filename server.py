@@ -174,9 +174,12 @@ def init_db():
                nav_x FLOAT,
                nav_y FLOAT,
                nav_yaw FLOAT,
+               arrived_at DATETIME,
                scanned_at DATETIME,
                picked_at DATETIME
            )""",
+        """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PickTasks' AND COLUMN_NAME='arrived_at')
+              ALTER TABLE PickTasks ADD arrived_at DATETIME""",
     ]
     with get_connection() as conn:
         cur = conn.cursor()
@@ -910,6 +913,7 @@ def get_order_detail(oid: int):
                    pt.nav_x, pt.nav_y, pt.nav_yaw,
                    l.location_code, l.rack, l.slot,
                    p.product_code, p.name AS product_name,
+                   CONVERT(NVARCHAR, pt.arrived_at, 120) AS arrived_at,
                    CONVERT(NVARCHAR, pt.scanned_at, 120) AS scanned_at,
                    CONVERT(NVARCHAR, pt.picked_at, 120)  AS picked_at
             FROM PickTasks pt
@@ -1152,17 +1156,24 @@ async def pick_scan_confirm(b: PickConfirm):
     with get_connection() as conn:
         cur = conn.cursor()
 
-        # Find location by QR code
+        # Find location by QR code; if not found, auto-create it
         cur.execute("SELECT id FROM Locations WHERE location_code=?", b.qr_code)
         loc_row = cur.fetchone()
         if not loc_row:
-            raise HTTPException(404, f"Unknown location: {b.qr_code}")
-        loc_id = loc_row[0]
+            # Auto-create location on first scan
+            cur.execute(
+                "INSERT INTO Locations (location_code) OUTPUT INSERTED.id VALUES (?)",
+                b.qr_code,
+            )
+            loc_id = int(cur.fetchone()[0])
+            conn.commit()
+        else:
+            loc_id = loc_row[0]
 
         # Find the first PENDING pick task at this location for an IN_PROGRESS order
         cur.execute(
             """
-            SELECT pt.id, pt.order_id, pt.order_item_id, pt.product_id, pt.quantity
+            SELECT pt.id, pt.order_id, pt.order_item_id, pt.product_id, pt.quantity, pt.arrived_at
             FROM PickTasks pt
             JOIN Orders o ON pt.order_id = o.id
             WHERE pt.location_id = ? AND pt.status = 'PENDING' AND o.status = 'IN_PROGRESS'
@@ -1172,20 +1183,59 @@ async def pick_scan_confirm(b: PickConfirm):
         )
         task = cur.fetchone()
         if not task:
-            # No pending task — just log the scan normally
+            # Check whether this robot has an active order with a pending task elsewhere
+            # (wrong shelf) vs genuinely no active mission (incidental scan)
             cur.execute(
-                "INSERT INTO ScanLogs (robot_code, qr_code, scan_time) VALUES (?,?,GETDATE())",
+                """
+                SELECT TOP 1 l.location_code
+                FROM PickTasks pt
+                JOIN Orders o ON pt.order_id = o.id
+                JOIN Locations l ON pt.location_id = l.id
+                WHERE o.assigned_robot = ? AND o.status = 'IN_PROGRESS'
+                  AND pt.status = 'PENDING'
+                ORDER BY o.id, pt.seq
+                """,
+                b.robot_code,
+            )
+            expected_row = cur.fetchone()
+
+            # Log the scan regardless
+            cur.execute(
+                "INSERT INTO ScanLogs (robot_code, qr_code, scan_time) OUTPUT INSERTED.id VALUES (?,?,GETDATE())",
                 b.robot_code,
                 b.qr_code,
             )
+            scan_log_id = int(cur.fetchone()[0])
             conn.commit()
+
+            # Broadcast general scan event for Live View
+            enriched = fetch_enriched_scan(scan_log_id)
+            await manager.broadcast({"type": "scan", "data": enriched})
+
+            if expected_row:
+                # Robot has an active order but scanned the wrong shelf
+                expected_loc = expected_row[0]
+                await manager.broadcast(
+                    {
+                        "type": "pick_wrong_shelf",
+                        "robot_code": b.robot_code,
+                        "scanned": b.qr_code,
+                        "expected": expected_loc,
+                    }
+                )
+                return {
+                    "status": "wrong_shelf",
+                    "scanned": b.qr_code,
+                    "expected": expected_loc,
+                }
+
             await manager.broadcast({"type": "pick_no_task", "qr_code": b.qr_code})
             return {
                 "status": "logged",
                 "message": "No pending pick task at this location",
             }
 
-        pt_id, order_id, oi_id, product_id, pick_qty = task
+        pt_id, order_id, oi_id, product_id, pick_qty, arrived_at = task
 
         # Mark task as SCANNED
         cur.execute(
@@ -1195,11 +1245,16 @@ async def pick_scan_confirm(b: PickConfirm):
 
         # Log scan
         cur.execute(
-            "INSERT INTO ScanLogs (robot_code, qr_code, scan_time) VALUES (?,?,GETDATE())",
+            "INSERT INTO ScanLogs (robot_code, qr_code, scan_time) OUTPUT INSERTED.id VALUES (?,?,GETDATE())",
             b.robot_code,
             b.qr_code,
         )
+        scan_log_id = int(cur.fetchone()[0])
         conn.commit()
+
+        # Broadcast general scan event for Live View
+        enriched = fetch_enriched_scan(scan_log_id)
+        await manager.broadcast({"type": "scan", "data": enriched})
 
     await manager.broadcast(
         {
@@ -1209,21 +1264,61 @@ async def pick_scan_confirm(b: PickConfirm):
             "location": b.qr_code,
         }
     )
+
+    # If mission callback already marked arrival, complete immediately after scan confirmation.
+    if arrived_at:
+        await pick_complete(pt_id)
+
     return {"status": "scanned", "pick_task_id": pt_id, "order_id": order_id}
+
+
+@app.post("/pick/{pt_id}/arrived", tags=["Orders"])
+async def pick_arrived(pt_id: int):
+    """
+    Mission callback when robot reaches a pick shelf.
+    This must happen before /pick/{pt_id}/complete can finalize the pick.
+    """
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT order_id, status, arrived_at FROM PickTasks WHERE id=?", pt_id
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Pick task not found")
+
+        order_id, status, arrived_at = row
+        if status in ("PICKED", "CANCELLED"):
+            return {"status": "ignored", "message": f"Task already {status.lower()}"}
+
+        if not arrived_at:
+            cur.execute("UPDATE PickTasks SET arrived_at=GETDATE() WHERE id=?", pt_id)
+            conn.commit()
+
+    await manager.broadcast(
+        {
+            "type": "pick_arrived",
+            "order_id": order_id,
+            "pick_task_id": pt_id,
+        }
+    )
+    return {"status": "arrived", "pick_task_id": pt_id, "order_id": order_id}
 
 
 @app.post("/pick/{pt_id}/complete", tags=["Orders"])
 async def pick_complete(pt_id: int):
     """
-    Picking mechanism finished — mark task PICKED, decrement inventory,
-    update order item, check if full order is complete.
+    Finalize one pick task only after BOTH conditions are true:
+    1) robot reached the shelf (arrived_at set by mission callback)
+    2) shelf QR scan confirmed (status is SCANNED)
     """
     with get_connection() as conn:
         cur = conn.cursor()
 
         cur.execute(
             """
-            SELECT pt.order_id, pt.order_item_id, pt.location_id, pt.product_id, pt.quantity, pt.status
+            SELECT pt.order_id, pt.order_item_id, pt.location_id, pt.product_id,
+                   pt.quantity, pt.status, pt.arrived_at
             FROM PickTasks pt WHERE pt.id=?
         """,
             pt_id,
@@ -1231,9 +1326,19 @@ async def pick_complete(pt_id: int):
         row = cur.fetchone()
         if not row:
             raise HTTPException(404, "Pick task not found")
-        order_id, oi_id, loc_id, product_id, pick_qty, status = row
-        if status not in ("SCANNED", "PENDING"):
-            raise HTTPException(400, f"Task already {status}")
+        order_id, oi_id, loc_id, product_id, pick_qty, status, arrived_at = row
+
+        if status == "PICKED":
+            cur.execute("SELECT status FROM Orders WHERE id=?", order_id)
+            order_row = cur.fetchone()
+            order_complete = bool(order_row and order_row[0] == "COMPLETED")
+            return {"status": "already_picked", "order_complete": order_complete}
+        if status == "CANCELLED":
+            raise HTTPException(400, "Task already cancelled")
+        if not arrived_at:
+            raise HTTPException(409, "Task not yet arrived at shelf")
+        if status != "SCANNED":
+            raise HTTPException(409, "Task not yet scanned/confirmed")
 
         # Mark PICKED
         cur.execute(
@@ -1610,7 +1715,7 @@ def seed_demo():
                 "AMR_01",
                 "TurtleBot3 — main floor robot",
                 "IDLE",
-                "192.168.1.56",
+                "100.92.6.94",
                 HOME_COORD["x"],
                 HOME_COORD["y"],
                 HOME_COORD["yaw"],

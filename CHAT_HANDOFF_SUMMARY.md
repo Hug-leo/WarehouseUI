@@ -1,5 +1,43 @@
 # Warehouse AMR Dashboard - Chat Handoff Summary
 
+## 13. 2026-04-22: QR Scan, Order Completion, and Frontend Robustness
+
+### Objectives
+
+- Ensure the QR scan → order completion workflow is robust and provides real-time feedback in the dashboard.
+- Add clear UI/logic for wrong-shelf scans and order completion.
+- Diagnose and fix persistent frontend “Connecting to server” bug.
+- Map all code locations for scan/order logic for future handoff.
+
+### Actions Taken
+
+- Verified Pi-side QR scanner posts to backend `/pick/scan` and `/pick/{id}/complete` endpoints.
+- Confirmed backend (server.py) marks pick as SCANNED, detects wrong shelf, and marks as PICKED when correct.
+- Ensured backend broadcasts real-time events (`pick_scanned`, `pick_wrong_shelf`, `order_completed`) via WebSocket.
+- Confirmed frontend (index.html) handles all events:
+  - Shows warning light and UI alarm for wrong shelf.
+  - Flashes order row and auto-refreshes Orders tab on completion.
+  - WebSocket connection watchdog added for robust reconnects.
+- Diagnosed frontend bug: “Connecting to server” stuck due to JS syntax error (duplicate parameter in `viewOrder`).
+- Fixed JS error, added error feedback, and verified dashboard now connects and updates as expected.
+- Used Node.js, PowerShell, and Playwright to verify frontend and backend state.
+
+### Code Locations
+
+- **Backend:** `server.py` (`/pick/scan`, `/pick/{id}/complete`, WebSocket manager)
+- **Pi agent:** `pi_bridge_agent.py` (QR scan logic, posts to backend)
+- **Frontend:** `index.html` (WebSocket, UI feedback, order/scan event handlers)
+
+### Status
+
+- QR scan → order completion workflow is fully implemented and tested.
+- Wrong shelf detection and UI alarm are in place.
+- Orders tab auto-refreshes and flashes on completion.
+- WebSocket connection is robust and self-healing.
+- All major user requests for this workflow have been addressed and verified.
+
+---
+
 Date: 2026-04-18
 Workspace: e:/Warehouse
 

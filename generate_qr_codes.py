@@ -8,30 +8,29 @@ Output: qr_codes/ folder with individual PNGs + one print sheet.
 """
 
 import os
+import requests
 import qrcode
 from PIL import Image, ImageDraw, ImageFont
 
-# ── Define your warehouse locations here ──────────────────────
-# Format: (location_code, rack, slot)
-# The location_code is what goes INSIDE the QR code.
-LOCATIONS = [
-    ("RACK_A_01", "A", "01"),
-    ("RACK_A_02", "A", "02"),
-    ("RACK_A_03", "A", "03"),
-    ("RACK_B_01", "B", "01"),
-    ("RACK_B_02", "B", "02"),
-    ("RACK_B_03", "B", "03"),
-    ("RACK_C_01", "C", "01"),
-    ("RACK_C_02", "C", "02"),
-    ("RACK_C_03", "C", "03"),
-    ("RACK_D_01", "D", "01"),
-    ("RACK_D_02", "D", "02"),
-    ("RACK_D_03", "D", "03"),
-]
+
+# Change this to your actual backend server URL if not running locally
+BACKEND_URL = "http://localhost:8000/locations"
 
 OUTPUT_DIR = "qr_codes"
 QR_SIZE = 300  # pixels per individual QR image
 LABEL_HEIGHT = 50  # space below QR for the text label
+
+
+def fetch_locations():
+    """Fetch all shelf locations from the backend API."""
+    resp = requests.get(BACKEND_URL)
+    resp.raise_for_status()
+    # The API returns a list of dicts with keys: location_code, rack, slot, ...
+    locations = resp.json()
+    return [
+        (loc["location_code"], loc.get("rack", ""), loc.get("slot", ""))
+        for loc in locations
+    ]
 
 
 def make_qr(location_code: str) -> Image.Image:
@@ -89,7 +88,24 @@ def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     cards = []
 
-    for loc_code, rack, slot in LOCATIONS:
+    print(f"Fetching locations from {BACKEND_URL} ...")
+    try:
+        locations = fetch_locations()
+    except requests.exceptions.ConnectionError:
+        print(f"ERROR: Could not connect to {BACKEND_URL}")
+        print("Make sure your backend server is running before running this script.")
+        return
+    except requests.exceptions.HTTPError as e:
+        print(f"ERROR: Server returned an error: {e}")
+        return
+
+    if not locations:
+        print(
+            "No shelf locations found in the database. Please add shelves to the Locations table first."
+        )
+        return
+
+    for loc_code, rack, slot in locations:
         card = make_qr(loc_code)
         card.save(os.path.join(OUTPUT_DIR, f"{loc_code}.png"))
         cards.append(card)
@@ -104,10 +120,10 @@ def main():
     print(f"  Generated {len(cards)} QR codes in '{OUTPUT_DIR}/'")
     print(f"  Print sheet: {sheet_path}")
     print(f"{'='*50}")
-    print(f"\n  Now add these locations in the dashboard:")
+    print(f"\n  Locations in the database:")
     print(f"  {'Location Code':<16} {'Rack':<6} {'Slot'}")
     print(f"  {'-'*16} {'-'*6} {'-'*4}")
-    for loc_code, rack, slot in LOCATIONS:
+    for loc_code, rack, slot in locations:
         print(f"  {loc_code:<16} {rack:<6} {slot}")
 
 
