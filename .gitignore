@@ -1,7 +1,7 @@
-# ── Pi robot workspace (uploaded to a separate repo) ──────────
+# Pi robot workspace (uploaded to a separate repo)
 Turtlebot3PI-master/
 
-# ── Python ────────────────────────────────────────────────────
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
@@ -9,12 +9,23 @@ __pycache__/
 venv/
 *.egg-info/
 
-# ── QR code images (generated locally) ───────────────────────
+# Generated QR code images
 qr_codes/
 
-# ── OS / editor ───────────────────────────────────────────────
+# Auxiliary local tools no longer used in the deployed workflow
+generate_qr_codes.py
+MJPEG stream on PC.py
+pi_bridge_agent.py
+.tmp_inline.js
+non_ascii_matches.txt
+turtlebot3_waffle_pi.urdf
+
+# OS / editor
 .DS_Store
 Thumbs.db
 desktop.ini
 .vscode/
 *.swp
+
+# Docs
+docs/
