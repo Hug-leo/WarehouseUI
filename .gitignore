@@ -19,6 +19,7 @@ pi_bridge_agent.py
 .tmp_inline.js
 non_ascii_matches.txt
 turtlebot3_waffle_pi.urdf
+CHAT_HANDOFF_SUMMARY.md
 
 # OS / editor
 .DS_Store
